@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en" data-theme="meridian">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#08060f">
+<title>MERIDIAN</title>
+<meta name="description" content="A personal library of what mastery of a field actually contains.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/polymath.css">
+<link rel="stylesheet" href="css/meridian.css">
+</head>
+<body>
+
+<!-- ══ LOGIN GATE ══ -->
+<div class="gate" id="gate" hidden>
+  <div class="gate-card">
+    <div class="brand-mark" style="width:38px;height:38px;border-radius:10px;margin:0 auto">
+      <svg viewBox="0 0 24 24" style="width:20px;height:20px"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M9 8h6M9 12h4"/></svg>
+    </div>
+    <h1>MERIDIAN</h1>
+    <p>sign in to sync across devices</p>
+    <input class="gate-in" id="gateUser" type="email" placeholder="email" autocomplete="email">
+    <input class="gate-in" id="gatePass" type="password" placeholder="password" autocomplete="current-password">
+    <button class="btn grad gate-go" id="gateBtn">Log in</button>
+    <div class="gate-err" id="gateErr"></div>
+    <div class="gate-switch" id="gateSwitch"></div>
+    <button class="gate-skip" id="gateSkip">Continue without signing in</button>
+  </div>
+</div>
+
+<div class="boot-err" id="bootErr" hidden></div>
+
+<div id="app">
+
+<!-- ══ TOP BAR ══ -->
+<header class="topbar">
+  <div class="topbar-in">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M9 8h6M9 12h4"/></svg>
+      </div>
+      <div>
+        <div class="brand-name">MERIDIAN</div>
+        <div class="brand-sub" id="brandSub">loading</div>
+      </div>
+    </div>
+    <nav class="tabs" id="mainTabs">
+      <button class="tab" data-view="dashboard">Dashboard</button>
+      <button class="tab" data-view="atlas">Atlas</button>
+      <button class="tab" data-view="profile">Record</button>
+      <button class="tab" data-view="web">Web</button>
+      <button class="tab" data-view="books">Books</button>
+      <button class="tab" data-view="stacks">Stacks</button>
+      <button class="tab" data-view="calendar">Calendar</button>
+      <button class="tab" data-view="thoughts">Margin</button>
+      <button class="tab" data-view="vision">Board</button>
+      <button class="tab" data-view="board">Gallery</button>
+      <button class="tab" data-view="oracle">Oracle <span class="soon-badge">soon</span></button>
+    </nav>
+    <div class="toolbar">
+      <span class="pill who" id="whoBox" hidden>
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.5 3.1-6 7-6s7 2.5 7 6"/></svg>
+        <b id="whoami"></b>
+      </span>
+      <button class="pill" id="btnTheme" title="Switch theme">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+      </button>
+      <button class="pill" id="btnBackup" title="Download backup">
+        <svg viewBox="0 0 24 24"><path d="M12 3v12M7 11l5 5 5-5M4 20h16"/></svg>
+      </button>
+      <label class="pill" title="Restore backup" style="cursor:pointer">
+        <svg viewBox="0 0 24 24"><path d="M12 21V9M7 13l5-5 5 5M4 4h16"/></svg>
+        <input type="file" id="fileRestore" accept="application/json" hidden>
+      </label>
+      <button class="pill" id="btnOut" hidden title="Sign out">
+        <svg viewBox="0 0 24 24"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 16l-4-4 4-4M6 12h11"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ══ DASHBOARD ══ -->
+  <section class="view" id="view-dashboard">
+    <div class="filters" id="dashFilters"></div>
+    <div class="kpis" id="dashKpis"></div>
+    <div class="grid g7-5">
+      <div class="card"><div class="card-h"><div class="card-t">Mastery Overview</div></div><div class="card-b chart-wrap" id="dashArea"></div></div>
+      <div class="card"><div class="card-h"><div class="card-t">Subject Distribution</div></div><div class="card-b" id="dashDonut"></div></div>
+    </div>
+    <div class="grid g5-7">
+      <div class="card"><div class="card-h"><div class="card-t">Subjects</div></div><div class="card-b" id="dashBars"></div></div>
+      <div class="card"><div class="card-h"><div class="card-t" id="dashBarsTitle">Mastery by Subject</div></div><div class="card-b" id="dashVBars"></div></div>
+    </div>
+    <div class="grid g2">
+      <div class="card" id="financeCard"></div>
+      <div class="card"><div class="card-h"><div class="card-t">Recent Activity</div></div><div class="card-b" id="dashActivity"></div></div>
+    </div>
+    <div class="grid g2">
+      <div class="card"><div class="card-h"><div class="card-t">Theme</div></div><div class="card-b"><div class="th-picker" id="themePicker"></div></div></div>
+      <div class="card"><div class="card-h"><div class="card-t">Oracle</div><div class="card-x"><span class="chip"><span class="soon-badge">coming soon</span></span></div></div>
+        <div class="card-b"><div class="empty" style="text-align:left"><b>The assistant layer is not live yet.</b>When it is, it will answer against your own library.</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ ATLAS ══ -->
+  <section class="view" id="view-atlas">
+    <div class="sub-tabs" id="atlasTabs"></div>
+    <div class="atlas-grid" id="atlasGrid">
+      <aside class="card atlas-idx" id="atlasIdx"></aside>
+      <div class="card reader" id="atlasRead"></div>
+    </div>
+  </section>
+
+  <!-- ══ POLYMATH SCREENS ══ -->
+  <section class="view" id="view-profile"><div id="profile"></div></section>
+  <section class="view" id="view-web"><canvas id="webCanvas"></canvas><div id="webPanel" class="panel"></div></section>
+  <section class="view" id="view-books"><div id="booksWrap"></div></section>
+  <section class="view" id="view-stacks"><div id="stacksWrap"></div></section>
+  <section class="view" id="view-calendar"><div id="calWrap"></div></section>
+  <section class="view" id="view-thoughts"><div id="thoughtsWrap"></div></section>
+  <section class="view" id="view-vision"><div id="boardWrap"><canvas id="board"></canvas></div><div id="visPalette"></div></section>
+
+  <!-- ══ GALLERY (Polymath board images) ══ -->
+  <section class="view" id="view-board"><div id="boardBody"></div></section>
+
+  <!-- ══ ORACLE ══ -->
+  <section class="view" id="view-oracle"><div class="card oracle" id="oracleBody"></div></section>
+
+</main>
+
+</div><!-- #app -->
+
+<div class="lightbox" id="lightbox" hidden></div>
+<div class="toast" id="toast" hidden></div>
+
+<!-- error catcher — must be before any module -->
+<script>
+window.addEventListener('error', function(e) {
+  var b = document.getElementById('bootErr');
+  if (!b) return; b.hidden = false;
+  b.innerHTML = '<b>Something failed to load.</b>' +
+    '<span>' + String(e.message || e.type).replace(/[<>]/g,'') + '</span>' +
+    '<span>' + String((e.filename||'').split('/').pop()||'') + (e.lineno?' line '+e.lineno:'') + '</span>' +
+    '<span>If a file was not found, make sure index.html sits at the repo root, not inside a subfolder.</span>';
+});
+</script>
+
+<!-- config first -->
+<script src="js/config.js"></script>
+
+<!-- subject data -->
+<script src="data/economics.js"></script>
+<script src="data/finance.js"></script>
+<script src="data/law.js"></script>
+<script src="data/mathematics.js"></script>
+<script src="data/physics.js"></script>
+<script src="data/business.js"></script>
+<script src="data/politics.js"></script>
+<script src="data/computer-science.js"></script>
+
+<!-- Polymath foundation -->
+<script src="js/store.js"></script>
+<script src="js/sync.js"></script>
+<script src="js/themes.js"></script>
+<script src="js/gestures.js"></script>
+<script src="js/connections.js"></script>
+<script src="js/profile.js"></script>
+<script src="js/web.js"></script>
+<script src="js/books.js"></script>
+<script src="js/calendar.js"></script>
+<script src="js/thoughts.js"></script>
+<script src="js/stacks.js"></script>
+<script src="js/vision.js"></script>
+<script src="js/mobile.js"></script>
+
+<!-- Meridian layers -->
+<script src="js/core.js"></script>
+<script src="js/theme-engine.js"></script>
+<script src="js/atlas.js"></script>
+<script src="js/dashboard.js"></script>
+<script src="js/finance.js"></script>
+<script src="js/board-view.js"></script>
+<script src="js/oracle.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
