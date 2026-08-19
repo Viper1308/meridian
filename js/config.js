@@ -21,7 +21,7 @@ window.MERIDIAN = {
 
   /* Finance widget — set your API key from finnhub.io (free) */
   finance: {
-    key: '',
+    key: 'da306f1r01qupvfb436gda306f1r01qupvfb4370',
     symbols: ['RELIANCE.NS', 'TCS.NS', 'HDFCBANK.NS', 'INFY.NS', 'SENSEX.BO']
   }
 };
