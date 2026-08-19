@@ -31,7 +31,7 @@ const App = (() => {
       if (v === 'stacks' && typeof Stacks !== 'undefined') Stacks.render();
       if (v === 'calendar' && typeof Calendar !== 'undefined') Calendar.render();
       if (v === 'thoughts' && typeof Margin !== 'undefined') Margin.render();
-      if (v === 'vision' && typeof Vision !== 'undefined') Vision.refresh();
+      if (v === 'vision' && typeof Board !== 'undefined') Board.refresh();
     } catch(e) { console.warn('render ' + v + ':', e.message); }
     if (v === 'dashboard') {
       Dashboard.render();
@@ -121,7 +121,7 @@ const App = (() => {
     safeInit('Margin', typeof Margin!=='undefined'&&Margin);
     safeInit('Calendar', typeof Calendar!=='undefined'&&Calendar);
     safeInit('Stacks', typeof Stacks!=='undefined'&&Stacks);
-    safeInit('Vision', typeof Vision!=='undefined'&&Vision);
+    safeInit('Board', typeof Board!=='undefined'&&Board);
 
     // Sync
     if (Sync.enabled) {

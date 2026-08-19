@@ -63,7 +63,10 @@ const Sync = (() => {
   }
   async function signUp(email, password) {
     if (!sb) throw new Error('offline');
-    const { data, error } = await sb.auth.signUp({ email, password });
+    const { data, error } = await sb.auth.signUp({
+      email, password,
+      options: { emailRedirectTo: window.location.origin }
+    });
     if (error) throw error;
     // If email confirmation is OFF (recommended for personal use), we get a session now.
     user = data.user;
