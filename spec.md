@@ -71,7 +71,121 @@ unchanged — this was a layout pass, not a logic change.
 
 ---
 
+## ✅ Done — Batch 3
+
+### Stacks — DONE
+**Original ask:** The spatial "floor" is back. Graphically, it resembles a
+messy room where major tasks are literal stacks of books you can drag
+around. The individual books represent subtasks. Mark a subtask complete,
+and that specific book physically vanishes from the pile.
+
+**Implementation:** `js/stacks.js` rewritten. `#view-stacks` is now a
+`.stk-floor` — a relatively-positioned surface with a faint dot-grid
+texture — instead of a `.stk-grid` card grid. Each stack renders as a
+`.stk-pile` absolutely positioned at a persisted `{x, y}`, dragged by its
+header via pointer events (`pointerdown`/`pointermove`/`pointerup`, with
+`setPointerCapture`, not native HTML5 drag-and-drop) — the exact fragility
+the original spec warned about. Positions are clamped to the floor's
+current bounds on every move and only written to `Store` on `pointerup`,
+not on every frame.
+
+Each open subtask renders as a `.stk-book` — a small colored block inside
+the pile, given a deterministic (index-derived, not random) rotation and
+horizontal nudge so the pile reads as messy without reshuffling on every
+re-render. Clicking a book completes that subtask: it plays a brief
+pop/fade transition, then is spliced out of the stack's `steps` array
+entirely — it doesn't linger struck-through the way it used to, it's just
+gone, same as a book leaving a physical pile. A per-stack `completed`
+counter persists the historical count since the steps themselves no longer
+carry a `done` flag.
+
+Renaming (double-click the pile name) and deleting a stack are unchanged
+in spirit from batch 1, just moved onto the pile itself instead of a card
+header. Old batch-1 data (`{id, name, steps:[{id,text,done}]}`, no
+position) is migrated on first load: already-done steps are dropped and
+folded into the new `completed` counter, remaining steps keep their
+`id`/`text`, and every stack without a position is handed one via a
+cascade so nothing loads stacked on top of itself.
+
+Data still lives in `Store` under `stacks` — same key, new shape.
+CSS added/rewritten under `/* ═══ STACKS — the spatial floor ═══ */` in
+`css/app.css` (`.stk-floor`, `.stk-pile`, `.stk-book`, etc); the old
+`.stk-grid`/`.stk-step` card-list rules are gone.
+
+### Board — DONE
+**Original ask:** The clunky toolbar is dead, replaced by a single, clean
+"add picture" button on the periphery. The canvas is now an infinitely
+loading plane you can pan endlessly in any direction. Backgrounds are
+fully mutable (grid, lines, blank, specific colors, or custom image
+uploads). Pictures can be arranged spatially with zero grid snapping.
+Added complex clipboard support: box-select an arrangement of images,
+copy, and paste the exact spatial configuration seamlessly, which persists
+even across Polymath and Meridian.
+
+**Implementation:** `js/board.js` rewritten (Gallery, at the bottom of the
+same file, is untouched — it just lists `Board.images()` and doesn't care
+about position). The old inline card + `.gal` masonry grid is replaced
+with a `.bd-stage` containing a fixed `.bd-viewport` and a `.bd-plane`
+that's translated by a persisted `{x, y}` pan offset. "Infinite" is done
+the deliberately cheap way: images sit at absolute plane-space coordinates
+with no canvas bounds at all — there's nothing to run out of, so panning
+never needs re-bounding math, only the translate value changes. There's no
+zoom; the original ask only mentioned panning.
+
+- **Add picture** — a single floating pill button (`.bd-fab`, top-right of
+  the stage) replaces the old inline form. Same client-side resize/
+  compress pipeline as before (max 900px, JPEG ~0.72 quality), same
+  `Store`/Sync path, same trade-off noted previously (fine for a personal
+  library, not a photo host).
+- **Backgrounds** — a small popover (toggled from a peripheral icon
+  cluster, top-left) offers Grid / Lines / Blank / a native color picker /
+  a custom image upload. Stored as `{type, value?}` under `boardBg`,
+  painted on the *viewport* (fixed) rather than the plane (moving) — a
+  deliberate simplification so the background doesn't need to track pan
+  math; it reads as "the floor under the glass" rather than literal
+  infinite wallpaper. Background images are compressed too (max 1600px,
+  JPEG ~0.6 quality) since they're viewed larger than a pinned photo.
+- **Free-form placement, zero snapping** — every image carries its own
+  `{x, y}` in plane space, set on drop (roughly centered on whatever's
+  currently in view, with a small per-session cascade so repeated adds
+  don't stack exactly on top of each other) and updated by dragging the
+  image directly. No grid, no snap-to.
+- **Box-select + clipboard** — holding Shift and dragging on empty canvas
+  draws a selection rectangle (in screen space, tested against each
+  image's `getBoundingClientRect()` — deliberately avoided doing this in
+  plane/transform space, since screen-space intersection needs no math
+  beyond a rectangle-overlap check). Shift-click toggles individual
+  images in/out of the selection. Selected images get a highlighted
+  outline. Copying (a peripheral icon button, or ⌘/Ctrl+C) serializes the
+  selection — each image's data URL, note, and *offset from the
+  selection's own top-left* — into JSON behind a version marker
+  (`MERIDIAN_BOARD_CLIP_V1:`) and writes it to the real OS clipboard via
+  `navigator.clipboard.writeText`. Pasting (icon button or ⌘/Ctrl+V) reads
+  the clipboard, checks for that marker, and re-creates every image at the
+  current view's center plus its original relative offset — the spatial
+  arrangement survives the round trip. This is the only mechanism that
+  could plausibly satisfy "persists even across Polymath and Meridian," as
+  called out as the riskiest unknown in the original notes: it's real OS
+  clipboard text, not an in-app buffer, so any app reading the same
+  marker/schema could interoperate. This file only implements Meridian's
+  side of that contract — Polymath would need to speak the same format.
+  Clipboard permission failures are caught and surfaced as a toast rather
+  than thrown.
+
+Data lives in `Store` under `boardImages` (now with `x`/`y` per image,
+otherwise unchanged shape), `boardPan` (pan offset, pushed to Sync with
+`skipPush` so continuous panning doesn't spam remote writes), and
+`boardBg` (background choice). CSS added/rewritten under
+`/* ═══ BOARD — infinite pannable plane ═══ */` in `css/app.css`; Gallery
+kept its own untouched `/* ═══ GALLERY ═══ */` block right after it.
+
+---
+
 ## ⏳ Queued — not yet started
+
+*(Batch 3 was done out of the suggested order — Stacks and Board, above —
+at the person's explicit request, so Calendar and Web below are still
+exactly as queued after batch 1.)*
 
 ### Calendar — NOT STARTED
 **Ask:** Completely re-architected spatial layout. The main calendar grid
@@ -113,60 +227,14 @@ ideas, fusion project ideas) which, at 78 pairs, is either hand-authored in
 a new data file or generated programmatically from existing subject data
 plus a per-pair template; worth a product decision before writing code.
 
-### Stacks — NOT STARTED
-**Ask:** The spatial "floor" is back. Graphically, it resembles a messy
-room where major tasks are literal stacks of books you can drag around.
-The individual books represent subtasks. Mark a subtask complete, and that
-specific book physically vanishes from the pile.
-
-**Notes for implementation:** This explicitly reverses the Module 3
-simplification — the README documents that the free-form spatial floor was
-deliberately removed for fragility reasons ("the most fragile screen in
-the old app"). Bringing it back means: draggable stack positions (x/y
-persisted per stack, likely via pointer events, not native HTML5 drag-and-
-drop given the earlier fragility note), a "messy room" visual treatment for
-each stack (a pile of book-shaped subtask blocks, offset/rotated per
-subtask to read as a physical stack rather than a list), and removing a
-subtask's book from the pile (not just marking it done in a list) when
-completed. Should be built carefully with simple, well-tested pointer-event
-math given the prior fragility history on this exact feature.
-
-### Board — NOT STARTED
-**Ask:** The clunky toolbar is dead, replaced by a single, clean "add
-picture" button on the periphery. The canvas is now an infinitely loading
-plane you can pan endlessly in any direction. Backgrounds are fully
-mutable (grid, lines, blank, specific colors, or custom image uploads).
-Pictures can be arranged spatially with zero grid snapping. Added complex
-clipboard support: box-select an arrangement of images, copy, and paste
-the exact spatial configuration seamlessly, which persists even across
-Polymath and Meridian.
-
-**Notes for implementation:** Current `js/board.js` stores/renders pinned
-images with captions (see README's account: compressed base64 in the same
-`kv`/Store path as everything else). This ask replaces that with a true
-infinite pannable canvas (no fixed bounds — needs a viewport-transform
-approach, e.g. a translated/scaled inner layer, not a fixed-size scrollable
-div), free-form absolute positioning per image (x/y, no grid snap),
-selectable/mutable backgrounds (grid, lines, blank, solid color, or a
-custom uploaded image), and box-select + copy/paste of a spatial
-arrangement of images. The "persists even across Polymath and Meridian"
-clause implies a shared clipboard mechanism outside this app's own
-`Store` (Polymath is a separate app) — likely the OS clipboard via the
-Clipboard API with a custom MIME type or JSON-in-text payload, which needs
-confirming/scoping before implementation, since cross-app clipboard
-behavior is the riskiest unknown in this whole spec.
-
 ---
 
 ## Suggested split for remaining batches
 
-- **Batch 2:** Web (data authoring + panel/interaction changes) and
-  Calendar (3-pane layout + `.ics` parsing + drag-to-pin) — both are
-  self-contained rewrites of one screen's file, no shared risk.
-- **Batch 3:** Stacks (spatial floor) and Board (infinite canvas +
-  clipboard) — grouped together because both are pointer-driven,
-  free-form-spatial rebuilds and benefit from being tested against each
-  other's interaction patterns in the same pass.
+- **Batch 2 (still queued):** Web (data authoring + panel/interaction
+  changes) and Calendar (3-pane layout + `.ics` parsing + drag-to-pin) —
+  both are self-contained rewrites of one screen's file, no shared risk.
 
-This is a suggestion, not a constraint — say the word if a different split
-or priority order is preferred.
+Batch 3 (Stacks + Board, above) is done. Batch 2 remains exactly as
+originally suggested — say the word to pick it up next, or to reorder
+again.
