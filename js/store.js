@@ -23,7 +23,7 @@ const Store = (() => {
     } catch (e) { return fallback; }
   }
 
-  function set(key, value) {
+  function set(key, value, opts) {
     const raw = JSON.stringify(value);
     try {
       if (usable) localStorage.setItem(PREFIX + key, raw);
@@ -31,6 +31,9 @@ const Store = (() => {
     } catch (e) {
       // quota exceeded or storage disabled mid-session — fall back silently
       mem[key] = raw;
+    }
+    if (!(opts && opts.skipPush) && typeof Sync !== 'undefined' && Sync.enabled) {
+      Sync.queuePush(key, value);
     }
     return value;
   }

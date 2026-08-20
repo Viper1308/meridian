@@ -9,13 +9,9 @@
    sees exactly what failed instead of a blank page.
    ════════════════════════════════════════════════════════════ */
 const App = (() => {
-  const LIVE = ['dashboard', 'atlas', 'record', 'books', 'calendar', 'margin'];
+  const LIVE = ['dashboard', 'atlas', 'record', 'books', 'calendar', 'margin', 'web', 'stacks', 'board', 'gallery'];
   const STUBS = {
-    web:      'The subject knowledge graph — being recoded from scratch. Coming in module 3.',
-    stacks:   'Draggable task piles. Coming in module 3.',
-    board:    'The vision board. Coming in module 3.',
-    gallery:  'A live view of your Board pictures. Coming in module 3.',
-    oracle:   'The AI assistant layer. Dormant by design — see the roadmap once it lands.',
+    oracle: 'The AI assistant layer. Dormant by design — see the roadmap once it lands.',
   };
   let current = null;
 
@@ -33,12 +29,17 @@ const App = (() => {
     Store.set('lastView', v);
 
     try {
-      if (v === 'dashboard') Dashboard.render();
+      if (v === 'dashboard') { Dashboard.render(); Finance.render('financeCard'); Slideshow.render('slideBody', 'slideDots'); }
+      else { Slideshow.stop(); }
       if (v === 'atlas') Atlas.refresh();
       if (v === 'record') Record.render();
       if (v === 'books') Books.render();
       if (v === 'calendar') Cal.render();
       if (v === 'margin') Margin.render();
+      if (v === 'web') Web.render();
+      if (v === 'stacks') Stacks.render();
+      if (v === 'board') Board.render();
+      if (v === 'gallery') Gallery.render();
       if (STUBS[v]) renderStub(v);
     } catch (err) {
       showError('Rendering "' + v + '" failed.', err);
@@ -73,7 +74,7 @@ const App = (() => {
   function backup() {
     try {
       const blob = new Blob([JSON.stringify({
-        v: 1, at: Date.now(), app: 'meridian', module: 1, data: Store.dump()
+        v: 1, at: Date.now(), app: 'meridian', data: Store.dump()
       }, null, 1)], { type: 'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -110,8 +111,12 @@ const App = (() => {
   }
 
   function step(label, fn) {
-    try { fn(); }
-    catch (e) { showError('Startup step failed: ' + label, e); }
+    try {
+      const r = fn();
+      if (r && typeof r.catch === 'function') {
+        r.catch(e => showError('Startup step failed: ' + label, e));
+      }
+    } catch (e) { showError('Startup step failed: ' + label, e); }
   }
 
   function boot() {
@@ -153,19 +158,57 @@ const App = (() => {
       });
     });
 
-    step('subject count in masthead', () => {
-      const n = (window.SUBJECTS || []).reduce((a, s) => a + Atlas.nTopics(s), 0);
-      const sub = document.getElementById('brandSub');
-      if (sub) sub.textContent = (window.SUBJECTS || []).length + ' subjects · ' + n.toLocaleString('en-IN') + ' topics';
-    });
-
     step('module init', () => {
       if (typeof Record !== 'undefined') Record.init();
       if (typeof Books !== 'undefined') Books.init();
       if (typeof Cal !== 'undefined') Cal.init();
       if (typeof Margin !== 'undefined') Margin.init();
+      if (typeof Web !== 'undefined') Web.init();
+      if (typeof Stacks !== 'undefined') Stacks.init();
+      if (typeof Board !== 'undefined') Board.init();
+      if (typeof Gallery !== 'undefined') Gallery.init();
     });
 
+    step('sign-out button', () => {
+      const bo = document.getElementById('btnOut');
+      if (bo) bo.onclick = async () => {
+        try { await Sync.signOut(); } catch (e) {}
+        location.reload();
+      };
+    });
+
+    step('sync + gate', async () => {
+      if (!Sync.enabled) { start(); return; }
+      const res = await Sync.init();
+      if (res.enabled && res.user) {
+        await Sync.pullAll();
+        start();
+      } else if (res.enabled) {
+        Gate.show();
+      } else {
+        toast('Cloud sync unavailable — working locally.');
+        start();
+      }
+    });
+  }
+
+  function showWho(user) {
+    const w = document.getElementById('whoBox');
+    const bo = document.getElementById('btnOut');
+    if (w && user) { w.hidden = false; document.getElementById('whoami').textContent = (user.email || '').split('@')[0]; }
+    if (bo) bo.hidden = false;
+  }
+
+  function start() {
+    step('who indicator', () => {
+      const user = (typeof Sync !== 'undefined' && Sync.currentUser) ? Sync.currentUser() : null;
+      if (user) showWho(user);
+    });
+    step('subject count in masthead', () => {
+      const n = (window.SUBJECTS || []).reduce((a, s) => a + Atlas.nTopics(s), 0);
+      const sub = document.getElementById('brandSub');
+      if (sub) sub.textContent = (window.SUBJECTS || []).length + ' subjects · ' + n.toLocaleString('en-IN') + ' topics';
+    });
     step('initial view', () => {
       const last = Store.get('lastView', 'dashboard');
       go(LIVE.includes(last) ? last : 'dashboard');
@@ -177,5 +220,5 @@ const App = (() => {
     catch (err) { showError('Startup failed entirely.', err); }
   });
 
-  return { go, search, backup };
+  return { go, search, backup, start };
 })();

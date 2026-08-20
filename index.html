@@ -13,6 +13,23 @@
 </head>
 <body>
 
+<div class="gate" id="gate" hidden>
+  <div class="gate-card">
+    <div class="brand-mark" style="width:38px;height:38px;border-radius:10px;margin:0 auto">
+      <svg viewBox="0 0 24 24" style="width:20px;height:20px"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M9 8h6M9 12h4"/></svg>
+    </div>
+    <h1>MERIDIAN</h1>
+    <p>sign in to sync across devices</p>
+    <input class="gate-in" id="gateUser" type="email" placeholder="email" autocomplete="email">
+    <input class="gate-in" id="gatePass" type="password" placeholder="password" autocomplete="current-password">
+    <button class="btn grad gate-go" id="gateBtn">Log in</button>
+    <div class="gate-err" id="gateErr"></div>
+    <div class="gate-switch" id="gateSwitch"></div>
+    <button class="gate-skip" id="gateSkip">Continue without signing in</button>
+  </div>
+</div>
+<div class="lightbox" id="lightbox" hidden></div>
+
 <div class="boot-err" id="bootErr" hidden></div>
 
 <header class="topbar" id="topbar">
@@ -40,6 +57,10 @@
       <button class="tab" data-view="oracle">Oracle <span class="soon">soon</span></button>
     </nav>
     <div class="toolbar">
+      <span class="pill who" id="whoBox" hidden>
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.5 3.1-6 7-6s7 2.5 7 6"/></svg>
+        <b id="whoami"></b>
+      </span>
       <button class="pill" id="btnTheme" title="Switch theme">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
       </button>
@@ -50,6 +71,9 @@
         <svg viewBox="0 0 24 24"><path d="M12 21V9M7 13l5-5 5 5M4 4h16"/></svg>
         <input type="file" id="fileRestore" accept="application/json" hidden>
       </label>
+      <button class="pill" id="btnOut" hidden title="Sign out">
+        <svg viewBox="0 0 24 24"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 16l-4-4 4-4M6 12h11"/></svg>
+      </button>
     </div>
   </div>
   <button class="topbar-fold" id="btnFold" title="Collapse the top bar">
@@ -72,14 +96,20 @@
       <div class="card"><div class="card-h"><div class="card-t" id="dashBarsTitle">Mastery by Subject</div></div><div class="card-b" id="dashVBars"></div></div>
     </div>
     <div class="grid g2">
+      <div class="card" id="financeCard"></div>
+      <div class="card slideshow-card">
+        <div class="card-h"><div class="card-t">From the Board</div><div class="card-x"><span class="chip" id="slideDots"></span></div></div>
+        <div class="card-b" style="padding:0 16px 16px" id="slideBody"></div>
+      </div>
+    </div>
+    <div class="grid g2">
       <div class="card"><div class="card-h"><div class="card-t">Recent Activity</div></div><div class="card-b" id="dashActivity"></div></div>
       <div class="card"><div class="card-h"><div class="card-t">Module status</div></div>
         <div class="card-b"><div class="empty" style="text-align:left">
-          <b>This is Module 2 of 3.</b>
-          Dashboard, Atlas, Record, Books, Calendar and Margin are fully live.
-          Web, Stacks, Board, Gallery and Oracle are still placeholders — click
-          one to see what's coming. Nothing here depends on Supabase or an
-          account; everything is saved in this browser.
+          <b>This is Module 3 of 3 — the full app.</b>
+          Every screen is live: Dashboard, Atlas, Record, Books, Calendar,
+          Margin, Web, Stacks, Board, Gallery. Oracle stays intentionally
+          dormant. Sync is optional — see the README to turn it on.
         </div></div>
       </div>
     </div>
@@ -134,6 +164,7 @@ window.addEventListener('error', function (e) {
 <script src="data/computer-science.js"></script>
 
 <!-- app -->
+<script src="js/config.js"></script>
 <script src="js/store.js"></script>
 <script src="js/theme.js"></script>
 <script src="js/charts.js"></script>
@@ -143,6 +174,13 @@ window.addEventListener('error', function (e) {
 <script src="js/books.js"></script>
 <script src="js/calendar.js"></script>
 <script src="js/margin.js"></script>
+<script src="js/sync.js"></script>
+<script src="js/gate.js"></script>
+<script src="js/web.js"></script>
+<script src="js/stacks.js"></script>
+<script src="js/board.js"></script>
+<script src="js/finance.js"></script>
+<script src="js/slideshow.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

@@ -1,353 +1,193 @@
-/* ══════════════ THE WEB — subjects, strands, dossiers ══════════════ */
+/* ════════════════════════════════════════════════════════════
+   WEB — a knowledge graph of the 8 subjects. Recoded from scratch.
+
+   The previous version broke because it used position:absolute;
+   inset:0 expecting a parent with real, explicit height — and the
+   parent never had one. This version never uses that pattern: the
+   SVG lives in a normal-flow div with an explicit height, and pan/
+   zoom happen via an SVG transform on a <g>, not via repositioning
+   the container itself. There is no ancestor-sizing dependency to
+   get wrong.
+
+   Interaction: drag a node to move it (position saved), drag empty
+   space to pan, wheel to zoom, click a node to open that subject
+   in the Atlas.
+   ════════════════════════════════════════════════════════════ */
 const Web = (() => {
-  const NS = 'http://www.w3.org/2000/svg';
-  const BASE = [
-    ['economics', 'Economics'], ['finance', 'Finance'], ['law', 'Law'], ['physics', 'Physics'],
-    ['math', 'Math'], ['ai', 'AI'], ['cs', 'Programming / CS'], ['philosophy', 'Philosophy'],
-    ['history', 'History'], ['politics', 'Politics'], ['logic', 'Logic'], ['debate', 'Debate'], ['art', 'Art']
+  const W = 900, H = 560; // internal SVG coordinate space
+  const R = Math.min(W, H) * 0.32;
+
+  // Meaningful cross-subject connections, not arbitrary.
+  const EDGES = [
+    ['economics', 'finance'], ['economics', 'business'], ['economics', 'politics'],
+    ['finance', 'business'], ['business', 'politics'], ['politics', 'law'],
+    ['law', 'business'], ['mathematics', 'physics'], ['mathematics', 'computer-science'],
+    ['physics', 'computer-science'], ['computer-science', 'business'],
+    ['computer-science', 'politics'], ['physics', 'economics'],
   ];
 
-  // uniform glyphs so every subject node is the same size → clean ring
-  const ICONS = {
-    economics: 'M4 20h16M7 16l3-4 3 3 4-6M6 8h1M10 6h1',
-    finance:   'M12 3v18M8 7h6a3 3 0 010 6H8m8 0h-6a3 3 0 000 6h7',
-    law:       'M12 4v16M6 20h12M5 8l3 4a3 3 0 01-6 0zM19 8l3 4a3 3 0 01-6 0zM5 8l7-2 7 2',
-    physics:   'M12 12m-2 0a2 2 0 104 0 2 2 0 10-4 0M12 12m-9 0a9 4.5 0 0018 0 9 4.5 0 00-18 0M12 12m0-9a4.5 9 30 000 18 4.5 9 30 000-18',
-    math:      'M5 5l6 7-6 7M13 5h6M13 12h6M13 19h6',
-    ai:        'M9 4h6v3H9zM7 7h10v8H7zM10 15v3M14 15v3M9 18h6M4 10h3M17 10h3M11 10.5v1M13 10.5v1',
-    cs:        'M8 8l-4 4 4 4M16 8l4 4-4 4M13 6l-2 12',
-    philosophy:'M12 3a5 5 0 00-3 9c1 1 1 2 1 3h4c0-1 0-2 1-3a5 5 0 00-3-9zM10 19h4M10.5 21h3',
-    history:   'M12 7v5l3 2M12 3a9 9 0 109 9M12 3V1M6 4L4.5 2.5',
-    politics:  'M12 3l9 5-9 5-9-5zM5 11v6M9 11v6M15 11v6M19 11v6M3 20h18',
-    logic:     'M6 6h5v5H6zM13 13h5v5h-5zM8.5 11v2M13 15.5h-2.5v-2.5',
-    debate:    'M4 6h9a2 2 0 012 2v3a2 2 0 01-2 2H8l-3 3v-3H4a2 2 0 01-2-2V8a2 2 0 012-2zM16 9h4a2 2 0 012 2v2a2 2 0 01-2 2h-1v2l-2-2',
-    art:       'M12 3a9 9 0 00-9 9 5 5 0 005 5h1a2 2 0 012 2 2 2 0 002 2 9 9 0 007-9 9 9 0 00-10-9zM7.5 10.5v.01M9.5 7.5v.01M14.5 7.5v.01M16.5 10.5v.01'
-  };
-  const GENERIC_ICON = 'M12 3a9 9 0 100 18 9 9 0 000-18M12 8v8M8 12h8';
+  let view = { x: 0, y: 0, k: 1 };
+  let drag = null; // { type:'node'|'pan', id, startX, startY, ... }
 
-  let subjects = Store.get('web.subjects', BASE.map(([id, label]) => ({ id, label, topics: [] })));
-  let pos = Store.get('web.pos', {});
-  let custom = Store.get('web.custom', {});      // user-drawn strands
-  let notes = Store.get('web.notes', {});        // notes on built-in strands
-  let view = Store.get('web.view', { x: 0, y: 0, k: 1 });
+  function positions() { return Store.get('webPositions', {}); }
+  function savePositions(p) { Store.set('webPositions', p); }
 
-  let svg, gRoot, sel = null, selEdge = null, linkMode = false, linkFrom = null, tempLine = null;
-  let W = 1000, H = 700;
-
-  const saveAll = () => { Store.set('web.subjects', subjects); Store.set('web.pos', pos); Store.set('web.custom', custom); Store.set('web.notes', notes); Store.set('web.view', view); };
-  const key = (a, b) => [a, b].sort().join('|');
-  const subj = id => subjects.find(s => s.id === id);
-
-  /* ---------- node list (subjects + their topics) ---------- */
-  function nodes() {
-    const out = [];
-    subjects.forEach(s => {
-      out.push({ id: s.id, label: s.label, kind: 'subject' });
-      (s.topics || []).forEach(t => out.push({ id: `t:${s.id}:${t.id}`, label: t.label, kind: 'topic', parent: s.id }));
-    });
-    return out;
-  }
-  function label(id) { const n = nodes().find(n => n.id === id); return n ? n.label : id; }
-
-  /* ---------- layout ---------- */
-  function ring() {
-    const cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.37;
+  function defaultLayout() {
+    const subjects = window.SUBJECTS || [];
+    const pos = {};
     subjects.forEach((s, i) => {
       const a = (i / subjects.length) * Math.PI * 2 - Math.PI / 2;
-      pos[s.id] = { x: cx + Math.cos(a) * R, y: cy + Math.sin(a) * R };
-      (s.topics || []).forEach((t, j) => {
-        const tot = s.topics.length, sp = 0.5, aa = a - sp / 2 + (tot > 1 ? (j / (tot - 1)) * sp : 0);
-        pos[`t:${s.id}:${t.id}`] = { x: cx + Math.cos(aa) * (R + 92), y: cy + Math.sin(aa) * (R + 92) };
+      pos[s.id] = { x: W / 2 + R * Math.cos(a), y: H / 2 + R * Math.sin(a) };
+    });
+    return pos;
+  }
+
+  function mastery(subjectId) {
+    const s = (window.SUBJECTS || []).find(x => x.id === subjectId);
+    if (!s) return 0;
+    const P = Store.get('prog', {});
+    let m = 0;
+    s.sections.forEach(sec => sec.topics.forEach(t => { if (P[Atlas.pkey(s.id, t[0])]) m++; }));
+    return m;
+  }
+
+  function render() {
+    const host = document.getElementById('view-web');
+    if (!host) return;
+    view = Store.get('webView', { x: 0, y: 0, k: 1 });
+    host.innerHTML = `
+      <div class="web-toolbar">
+        <button class="btn" id="webReset">Re-ring</button>
+        <span class="web-hint">Drag a node to move it · drag empty space to pan · scroll to zoom · click a node to open it</span>
+      </div>
+      <div class="web-canvas-wrap" id="webCanvasWrap">
+        <svg id="webSvg" class="web-svg" viewBox="0 0 ${W} ${H}"></svg>
+      </div>`;
+    document.getElementById('webReset').onclick = () => {
+      savePositions({});
+      Store.set('webView', { x: 0, y: 0, k: 1 });
+      view = { x: 0, y: 0, k: 1 };
+      draw();
+    };
+    wireInteraction();
+    draw();
+  }
+
+  function draw() {
+    const svg = document.getElementById('webSvg');
+    if (!svg) return;
+    const subjects = window.SUBJECTS || [];
+    const saved = positions();
+    const dflt = defaultLayout();
+    const pos = {};
+    subjects.forEach(s => { pos[s.id] = saved[s.id] || dflt[s.id]; });
+
+    const ACCENT = { blue:'#4f7dfa', indigo:'#6366f1', violet:'#8b5cf6', magenta:'#d946ef',
+      sky:'#38bdf8', cyan:'#38bdf8', pink:'#ec4899', teal:'#2dd4bf' };
+
+    let edges = '';
+    EDGES.forEach(([a, b]) => {
+      if (!pos[a] || !pos[b]) return;
+      edges += `<line x1="${pos[a].x}" y1="${pos[a].y}" x2="${pos[b].x}" y2="${pos[b].y}" class="web-edge"/>`;
+    });
+
+    let nodes = '';
+    subjects.forEach(s => {
+      const p = pos[s.id];
+      if (!p) return;
+      const m = mastery(s.id);
+      const r = 26 + Math.min(m, 40) * 0.6;
+      const c = ACCENT[s.accent] || ACCENT.violet;
+      nodes += `<g class="web-node" data-id="${esc(s.id)}" transform="translate(${p.x},${p.y})">
+        <circle r="${r}" fill="${c}" fill-opacity=".16" stroke="${c}" stroke-width="2"/>
+        <circle r="4" fill="${c}"/>
+        <text class="web-label" y="${r + 16}" text-anchor="middle">${esc(s.short || s.name)}</text>
+        ${m > 0 ? `<text class="web-count" y="4" text-anchor="middle">${m}</text>` : ''}
+      </g>`;
+    });
+
+    svg.innerHTML = `<g id="webPlane" transform="translate(${view.x},${view.y}) scale(${view.k})">${edges}${nodes}</g>`;
+
+    svg.querySelectorAll('.web-node').forEach(n => {
+      n.addEventListener('pointerdown', e => startNodeDrag(e, n.dataset.id, pos));
+      n.addEventListener('click', e => {
+        if (drag && drag.moved) return; // suppress click after a real drag
+        Atlas.open(n.dataset.id);
+        App.go('atlas');
       });
     });
-    saveAll();
-  }
-  function ensurePos() {
-    let need = false;
-    nodes().forEach(n => { if (!pos[n.id]) need = true; });
-    if (need) ring();
   }
 
-  /* ---------- edges ---------- */
-  function edges() {
-    const out = [], seen = new Set();
-    for (let i = 0; i < subjects.length; i++)
-      for (let j = i + 1; j < subjects.length; j++) {
-        const k = key(subjects[i].id, subjects[j].id);
-        seen.add(k);
-        out.push({ k, a: subjects[i].id, b: subjects[j].id, custom: !CONNECTIONS[k] });
+  function wireInteraction() {
+    const wrap = document.getElementById('webCanvasWrap');
+    const svg = document.getElementById('webSvg');
+    if (!wrap || !svg) return;
+
+    svg.addEventListener('pointerdown', e => {
+      if (e.target.closest('.web-node')) return; // node handler takes it
+      drag = { type: 'pan', startX: e.clientX, startY: e.clientY, ox: view.x, oy: view.y, moved: false };
+      svg.setPointerCapture(e.pointerId);
+    });
+    svg.addEventListener('pointermove', e => {
+      if (!drag) return;
+      const dx = e.clientX - drag.startX, dy = e.clientY - drag.startY;
+      if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
+      if (drag.type === 'pan') {
+        view.x = drag.ox + dx; view.y = drag.oy + dy;
+        document.getElementById('webPlane').setAttribute('transform', `translate(${view.x},${view.y}) scale(${view.k})`);
+      } else if (drag.type === 'node') {
+        const rect = svg.getBoundingClientRect();
+        const scaleX = W / rect.width, scaleY = H / rect.height;
+        const svgX = (e.clientX - rect.left) * scaleX;
+        const svgY = (e.clientY - rect.top) * scaleY;
+        // convert from svg-space back through the pan/zoom transform
+        const x = (svgX - view.x) / view.k;
+        const y = (svgY - view.y) / view.k;
+        drag.pos[drag.id] = { x, y };
+        const g = svg.querySelector(`.web-node[data-id="${drag.id}"]`);
+        if (g) g.setAttribute('transform', `translate(${x},${y})`);
+        const edges = svg.querySelectorAll('.web-edge');
+        // cheap redraw of edges touching this node
+        redrawEdgesFor(drag.id, drag.pos);
       }
-    Object.values(custom).forEach(c => { if (!seen.has(key(c.a, c.b))) out.push({ k: key(c.a, c.b), a: c.a, b: c.b, custom: true }); });
-    return out;
-  }
-
-  /* ---------- draw ---------- */
-  function draw() {
-    ensurePos();
-    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
-    gRoot.setAttribute('transform', `translate(${view.x},${view.y}) scale(${view.k})`);
-    gRoot.innerHTML = '';
-
-    const gE = document.createElementNS(NS, 'g'), gN = document.createElementNS(NS, 'g');
-    gRoot.append(gE, gN);
-    const cx = W / 2, cy = H / 2;
-    const showAll = document.getElementById('wAllStrands').checked;
-
-    edges().forEach(e => {
-      const p1 = pos[e.a], p2 = pos[e.b];
-      if (!p1 || !p2) return;
-      const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
-      const qx = mx + (cx - mx) * 0.42, qy = my + (cy - my) * 0.42;
-      const d = `M${p1.x},${p1.y} Q${qx},${qy} ${p2.x},${p2.y}`;
-      const touches = sel && (e.a === sel || e.b === sel);
-
-      const hit = document.createElementNS(NS, 'path');
-      hit.setAttribute('d', d); hit.setAttribute('class', 'hitline');
-      const line = document.createElementNS(NS, 'path');
-      line.setAttribute('d', d);
-      let cls = 'strand' + (e.custom ? ' custom' : '');
-      if (selEdge === e.k) cls += ' sel';
-      else if (touches) cls += ' hot';
-      else if (sel || !showAll) cls += ' mute';
-      line.setAttribute('class', cls);
-      const open = ev => { ev.stopPropagation(); selEdge = e.k; sel = null; draw(); panel(e); };
-      hit.addEventListener('click', open); line.addEventListener('click', open);
-      hit.addEventListener('mouseenter', () => line.classList.add('hot'));
-      hit.addEventListener('mouseleave', () => { if (selEdge !== e.k && !touches) line.classList.remove('hot'); });
-      gE.append(line, hit);
     });
-
-    nodes().forEach(n => {
-      const p = pos[n.id]; if (!p) return;
-      const g = document.createElementNS(NS, 'g');
-      g.setAttribute('class', 'node' + (n.kind === 'topic' ? ' topic' : '') + (sel === n.id ? ' sel' : ''));
-      g.setAttribute('transform', `translate(${p.x},${p.y})`);
-
-      if (n.kind === 'topic') {
-        const r = 7;
-        const c = document.createElementNS(NS, 'circle');
-        c.setAttribute('r', r);
-        const t = document.createElementNS(NS, 'text');
-        t.textContent = n.label; t.setAttribute('y', -14);
-        g.append(c, t);
-        wireNode(g, n, r);
-      } else {
-        // uniform disc — same radius for every subject → perfect ring
-        const r = 26;
-        const c = document.createElementNS(NS, 'circle');
-        c.setAttribute('r', r);
-        const icon = document.createElementNS(NS, 'path');
-        icon.setAttribute('d', ICONS[n.id] || GENERIC_ICON);
-        icon.setAttribute('class', 'node-glyph');
-        icon.setAttribute('transform', 'translate(-12,-12)');
-        const t = document.createElementNS(NS, 'text');
-        t.textContent = n.label;
-        t.setAttribute('class', 'node-caption');
-        t.setAttribute('y', r + 16);
-        g.append(c, icon, t);
-        wireNode(g, n, r);
-      }
-      gN.appendChild(g);
-    });
-  }
-
-  /* ---------- pointer plumbing ---------- */
-  function toGraph(ev) {
-    const r = svg.getBoundingClientRect();
-    return { x: ((ev.clientX - r.left) * (W / r.width) - view.x) / view.k, y: ((ev.clientY - r.top) * (H / r.height) - view.y) / view.k };
-  }
-  function wireNode(g, n, r) {
-    let moved = false, start = null, off = null;
-    g.addEventListener('pointerdown', ev => {
-      ev.stopPropagation(); g.setPointerCapture(ev.pointerId);
-      moved = false; start = toGraph(ev);
-      if (linkMode || ev.shiftKey) {
-        linkFrom = n.id;
-        tempLine = document.createElementNS(NS, 'line');
-        tempLine.setAttribute('class', 'temp-line');
-        tempLine.setAttribute('x1', pos[n.id].x); tempLine.setAttribute('y1', pos[n.id].y);
-        tempLine.setAttribute('x2', pos[n.id].x); tempLine.setAttribute('y2', pos[n.id].y);
-        gRoot.appendChild(tempLine);
-      } else off = { x: pos[n.id].x - start.x, y: pos[n.id].y - start.y };
-    });
-    g.addEventListener('pointermove', ev => {
-      const p = toGraph(ev);
-      if (linkFrom === n.id && tempLine) { tempLine.setAttribute('x2', p.x); tempLine.setAttribute('y2', p.y); return; }
-      if (!off) return;
-      if (Math.hypot(p.x - start.x, p.y - start.y) > 3) moved = true;
-      pos[n.id] = { x: p.x + off.x, y: p.y + off.y };
-      g.setAttribute('transform', `translate(${pos[n.id].x},${pos[n.id].y})`);
-    });
-    g.addEventListener('pointerup', ev => {
-      if (linkFrom && tempLine) {
-        const p = toGraph(ev), target = nodeAt(p, linkFrom);
-        tempLine.remove(); tempLine = null;
-        const from = linkFrom; linkFrom = null;
-        if (target) makeStrand(from, target);
-        else { linkMode = false; document.getElementById('wLink').classList.remove('on'); svg.classList.remove('linking'); draw(); }
-        return;
-      }
-      if (off) { off = null; saveAll(); if (!moved) { sel = sel === n.id ? null : n.id; selEdge = null; draw(); if (sel) nodePanel(n); else hidePanel(); } else draw(); }
-    });
-  }
-  function nodeAt(p, not) {
-    let best = null, bd = 1e9;
-    nodes().forEach(n => {
-      if (n.id === not || !pos[n.id]) return;
-      const d = Math.hypot(pos[n.id].x - p.x, pos[n.id].y - p.y);
-      const r = n.kind === 'topic' ? 16 : 30;
-      if (d < r && d < bd) { bd = d; best = n.id; }
-    });
-    return best;
-  }
-  function makeStrand(a, b) {
-    const k = key(a, b);
-    if (!custom[k] && !CONNECTIONS[k]) custom[k] = { a, b, brief: '', developments: [], relevance: [], projects: [] };
-    saveAll(); selEdge = k; sel = null; draw();
-    panel({ k, a, b, custom: !CONNECTIONS[k] });
-    toast(`Strand drawn: ${label(a)} ↔ ${label(b)}`);
-  }
-
-  /* ---------- panels ---------- */
-  const P = () => document.getElementById('webPanel');
-  function hidePanel() { P().hidden = true; }
-  function shell(title, sub) {
-    const p = P(); p.hidden = false;
-    p.innerHTML = `<button class="wp-close" title="Close">✕</button>
-      <div class="eyebrow">${sub}</div><h2 class="wp-title">${title}</h2>`;
-    p.querySelector('.wp-close').onclick = () => { hidePanel(); selEdge = null; sel = null; draw(); };
-    return p;
-  }
-  function sec(p, head, html) {
-    const d = el('div', 'wp-sec');
-    d.innerHTML = `<h5>${head}</h5>${html}`;
-    p.appendChild(d); return d;
-  }
-  function panel(e) {
-    const built = CONNECTIONS[e.k];
-    const p = shell(`${esc(label(e.a))} <em>×</em> ${esc(label(e.b))}`, built ? 'Strand' : 'Your strand');
-    if (built) {
-      sec(p, 'How it actually plays out', `<div class="wp-brief">${built.brief}</div>`);
-      sec(p, 'Developments worth knowing', `<ul class="wp-list">${built.developments.map(d => `<li>${d}</li>`).join('')}</ul>`);
-      if (built.relevance?.length) sec(p, 'Also relevant', `<ul class="wp-list">${built.relevance.map(d => `<li>${d}</li>`).join('')}</ul>`);
-      sec(p, 'Five projects you could actually build', `<ul class="wp-list proj">${built.projects.map(d => `<li>${d}</li>`).join('')}</ul>`);
-      const n = sec(p, 'Your notes', `<textarea class="inp area mynotes" placeholder="What you make of this connection…"></textarea>`);
-      const ta = n.querySelector('textarea');
-      ta.value = notes[e.k] || '';
-      ta.onchange = () => { notes[e.k] = ta.value; saveAll(); toast('Note saved.'); };
-    } else {
-      const c = custom[e.k] || (custom[e.k] = { a: e.a, b: e.b, brief: '', developments: [], relevance: [], projects: [] });
-      const field = (head, k, ph, list) => {
-        const d = sec(p, head, `<textarea class="inp area mynotes" placeholder="${ph}"></textarea>`);
-        const ta = d.querySelector('textarea');
-        ta.value = list ? (c[k] || []).join('\n') : (c[k] || '');
-        ta.onchange = () => { c[k] = list ? ta.value.split('\n').filter(Boolean) : ta.value; saveAll(); toast('Saved.'); };
-      };
-      field('How it plays out', 'brief', 'Write the connection as you see it.');
-      field('Developments', 'developments', 'One per line.', true);
-      field('Also relevant', 'relevance', 'One per line.', true);
-      field('Projects', 'projects', 'One per line.', true);
-      const del = el('button', 'btn ghost danger', 'Remove this strand');
-      del.style.marginTop = '20px';
-      del.onclick = () => { delete custom[e.k]; saveAll(); hidePanel(); selEdge = null; draw(); };
-      p.appendChild(del);
-    }
-  }
-  function nodePanel(n) {
-    if (n.kind === 'topic') {
-      const p = shell(esc(n.label), 'Topic of ' + esc(label(n.parent)));
-      sec(p, 'What this is', `<div class="wp-brief">Drag a strand from here to anything else on the board. Hold Shift and drag, or switch on “Draw strand”.</div>`);
-      const del = el('button', 'btn ghost danger', 'Delete topic');
-      del.onclick = () => {
-        const s = subj(n.parent); s.topics = s.topics.filter(t => `t:${s.id}:${t.id}` !== n.id);
-        delete pos[n.id]; sel = null; saveAll(); hidePanel(); draw();
-      };
-      p.appendChild(del); return;
-    }
-    const s = subj(n.id);
-    const p = shell(esc(s.label), 'Subject');
-    const links = subjects.filter(x => x.id !== s.id).length;
-    sec(p, 'Position', `<div class="wp-brief">${links} strands run from here. Click any highlighted strand to open it.</div>`);
-    const t = sec(p, 'Topics', `<ul class="wp-list" id="tlist">${(s.topics || []).map(x => `<li>${esc(x.label)}</li>`).join('') || '<li style="color:var(--faint)">None yet.</li>'}</ul>
-      <div class="topic-add"><input class="inp tiny" id="tnew" placeholder="Add a topic"><button class="btn tiny" id="tadd">Add</button></div>`);
-    const go = () => {
-      const v = t.querySelector('#tnew').value.trim(); if (!v) return;
-      s.topics = s.topics || []; s.topics.push({ id: uid(), label: v });
-      saveAll(); ring(); draw(); nodePanel(n);
+    const end = () => {
+      if (drag && drag.type === 'pan') Store.set('webView', view);
+      if (drag && drag.type === 'node') savePositions(drag.pos);
+      drag = null;
     };
-    t.querySelector('#tadd').onclick = go;
-    t.querySelector('#tnew').onkeydown = e => { if (e.key === 'Enter') go(); };
-    if (!BASE.some(b => b[0] === s.id)) {
-      const del = el('button', 'btn ghost danger', 'Delete subject');
-      del.style.marginTop = '20px';
-      del.onclick = () => {
-        subjects = subjects.filter(x => x.id !== s.id);
-        Object.keys(custom).forEach(k => { if (k.split('|').some(p => p === s.id || p.startsWith('t:' + s.id))) delete custom[k]; });
-        sel = null; saveAll(); ring(); hidePanel(); draw();
-      };
-      p.appendChild(del);
-    }
-  }
+    svg.addEventListener('pointerup', end);
+    svg.addEventListener('pointercancel', end);
 
-  /* ---------- init ---------- */
-  function init() {
-    svg = document.getElementById('webSvg');
-    gRoot = document.createElementNS(NS, 'g');
-    svg.appendChild(gRoot);
-
-    const ro = new ResizeObserver(() => {
-      const r = svg.getBoundingClientRect();
-      if (!r.width) return;
-      const fresh = !Object.keys(pos).length;
-      W = Math.round(r.width); H = Math.round(r.height);
-      if (fresh) ring();
-      draw();
-    });
-    ro.observe(svg);
-
-    // pan + zoom
-    let panning = null;
-    svg.addEventListener('pointerdown', ev => {
-      if (ev.target.closest('.node') || ev.target.classList.contains('hitline')) return;
-      panning = { x: ev.clientX, y: ev.clientY, vx: view.x, vy: view.y };
-      sel = null; selEdge = null; hidePanel(); draw();
-    });
-    window.addEventListener('pointermove', ev => {
-      if (!panning) return;
-      const r = svg.getBoundingClientRect();
-      view.x = panning.vx + (ev.clientX - panning.x) * (W / r.width);
-      view.y = panning.vy + (ev.clientY - panning.y) * (H / r.height);
-      gRoot.setAttribute('transform', `translate(${view.x},${view.y}) scale(${view.k})`);
-    });
-    window.addEventListener('pointerup', () => { if (panning) { panning = null; saveAll(); } });
-    svg.addEventListener('wheel', ev => {
-      ev.preventDefault();
-      const p = toGraph(ev), f = ev.deltaY < 0 ? 1.12 : 1 / 1.12;
-      const k2 = Math.min(3, Math.max(.35, view.k * f));
-      const r = svg.getBoundingClientRect();
-      const sx = (ev.clientX - r.left) * (W / r.width), sy = (ev.clientY - r.top) * (H / r.height);
-      view.x = sx - p.x * k2; view.y = sy - p.y * k2; view.k = k2;
-      gRoot.setAttribute('transform', `translate(${view.x},${view.y}) scale(${view.k})`);
-      clearTimeout(svg._z); svg._z = setTimeout(saveAll, 400);
+    svg.addEventListener('wheel', e => {
+      e.preventDefault();
+      const factor = e.deltaY > 0 ? 0.9 : 1.1;
+      view.k = Math.max(0.4, Math.min(2.5, view.k * factor));
+      document.getElementById('webPlane').setAttribute('transform', `translate(${view.x},${view.y}) scale(${view.k})`);
+      Store.set('webView', view);
     }, { passive: false });
-
-    document.getElementById('wLink').onclick = e => {
-      linkMode = !linkMode;
-      e.target.classList.toggle('on', linkMode);
-      svg.classList.toggle('linking', linkMode);
-      document.getElementById('wHint').textContent = linkMode
-        ? 'Drag from one node to another to tie them together.'
-        : 'Click a strand to open it. Drag a node to move it.';
-    };
-    document.getElementById('wAddSubject').onclick = () => {
-      const name = prompt('New subject');
-      if (!name || !name.trim()) return;
-      subjects.push({ id: 'u_' + uid(), label: name.trim(), topics: [] });
-      ring(); draw(); toast(name.trim() + ' added — its strands are drawn and waiting to be written.');
-    };
-    document.getElementById('wReset').onclick = () => { ring(); view = { x: 0, y: 0, k: 1 }; saveAll(); draw(); };
-    document.getElementById('wAllStrands').onchange = draw;
   }
 
-  return { init, draw, get count() { return Object.keys(custom).length; } };
+  function startNodeDrag(e, id, currentPos) {
+    e.stopPropagation();
+    const svg = document.getElementById('webSvg');
+    svg.setPointerCapture(e.pointerId);
+    drag = { type: 'node', id, pos: { ...currentPos }, moved: false };
+  }
+
+  function redrawEdgesFor(id, pos) {
+    const svg = document.getElementById('webSvg');
+    if (!svg) return;
+    EDGES.forEach(([a, b], i) => {
+      if (a !== id && b !== id) return;
+      const line = svg.querySelectorAll('.web-edge')[i];
+      if (!line || !pos[a] || !pos[b]) return;
+      line.setAttribute('x1', pos[a].x); line.setAttribute('y1', pos[a].y);
+      line.setAttribute('x2', pos[b].x); line.setAttribute('y2', pos[b].y);
+    });
+  }
+
+  function init() { /* nothing to wire ahead of render */ }
+
+  return { init, render, draw };
 })();
