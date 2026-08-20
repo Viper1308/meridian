@@ -65,7 +65,10 @@ const Sync = (() => {
     if (!sb) throw new Error('offline');
     const { data, error } = await sb.auth.signUp({
       email, password,
-      options: { emailRedirectTo: window.location.origin }
+      options: {
+        emailRedirectTo: window.location.origin,
+        data: { app: 'meridian' }
+      }
     });
     if (error) throw error;
     // If email confirmation is OFF (recommended for personal use), we get a session now.

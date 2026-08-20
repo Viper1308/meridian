@@ -29,14 +29,13 @@ const App = (() => {
       if (v === 'web' && typeof Web !== 'undefined') Web.render();
       if (v === 'books' && typeof Books !== 'undefined') Books.render();
       if (v === 'stacks' && typeof Stacks !== 'undefined') Stacks.render();
-      if (v === 'calendar' && typeof Calendar !== 'undefined') Calendar.render();
+      if (v === 'calendar' && typeof Cal !== 'undefined') Cal.render();
       if (v === 'thoughts' && typeof Margin !== 'undefined') Margin.render();
       if (v === 'vision' && typeof Board !== 'undefined') Board.refresh();
     } catch(e) { console.warn('render ' + v + ':', e.message); }
     if (v === 'dashboard') {
       Dashboard.render();
       Finance.render('financeCard');
-      ThemeEngine.renderPicker('themePicker');
     }
     if (v === 'atlas') Atlas.refresh();
     if (v === 'board') Gallery.render();
@@ -119,9 +118,9 @@ const App = (() => {
     safeInit('Web', typeof Web!=='undefined'&&Web);
     safeInit('Books', typeof Books!=='undefined'&&Books);
     safeInit('Margin', typeof Margin!=='undefined'&&Margin);
-    safeInit('Calendar', typeof Calendar!=='undefined'&&Calendar);
+    safeInit('Calendar', typeof Cal!=='undefined'&&Cal);
     safeInit('Stacks', typeof Stacks!=='undefined'&&Stacks);
-    safeInit('Board', typeof Board!=='undefined'&&Board);
+    safeInit('Vision', typeof Board!=='undefined'&&Board);
 
     // Sync
     if (Sync.enabled) {
@@ -149,8 +148,8 @@ const App = (() => {
     function paintGate() {
       document.getElementById('gateBtn').textContent = isSignup ? 'Create account' : 'Log in';
       document.getElementById('gateSwitch').innerHTML = isSignup
-        ? 'Already have an account? <a href="#" id="gateLink">Log in</a>'
-        : 'Same credentials as Polymath. <a href="#" id="gateLink">Or create account</a>';
+        ? 'Already have an account? <a href="#" id="gateLink">Log in instead</a>'
+        : 'If you use Polymath, same email and password. <a href="#" id="gateLink">Or create a new account</a>';
       document.getElementById('gateLink').onclick = e => { e.preventDefault(); isSignup = !isSignup; paintGate(); };
     }
     paintGate();
@@ -166,7 +165,10 @@ const App = (() => {
       try {
         if (isSignup) {
           const r = await Sync.signUp(email, pass);
-          if (r.needsConfirm) { errEl.textContent = 'Check your email to confirm.'; btn.disabled = false; paintGate(); return; }
+          if (r.needsConfirm) {
+            errEl.textContent = 'Check your email to confirm, then come back and log in. If the link fails, go to your Supabase dashboard → Authentication → Users and confirm manually.';
+            isSignup = false; btn.disabled = false; paintGate(); return;
+          }
         } else {
           await Sync.signIn(email, pass);
         }

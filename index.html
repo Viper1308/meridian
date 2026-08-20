@@ -9,7 +9,7 @@
 <meta name="description" content="A personal library of what mastery of a field actually contains.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Bricolage+Grotesque:wght@400;500;600;700&family=Newsreader:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/polymath.css">
 <link rel="stylesheet" href="css/meridian.css">
 </head>
@@ -99,10 +99,13 @@
     </div>
     <div class="grid g2">
       <div class="card" id="financeCard"></div>
-      <div class="card"><div class="card-h"><div class="card-t">Recent Activity</div></div><div class="card-b" id="dashActivity"></div></div>
-    </div>
+          </div>
     <div class="grid g2">
-      <div class="card"><div class="card-h"><div class="card-t">Theme</div></div><div class="card-b"><div class="th-picker" id="themePicker"></div></div></div>
+      <div class="card"><div class="card-h"><div class="card-t">Recent Activity</div></div><div class="card-b" id="dashActivity"></div></div>
+      <div class="card"><div class="card-h"><div class="card-t">Oracle</div><div class="card-x"><span class="chip"><span class="soon-badge">coming soon</span></span></div></div>
+        <div class="card-b"><div class="empty" style="text-align:left"><b>The assistant layer is not live yet.</b>When it is, it will answer against your own library.</div></div>
+      </div>
+    </div>
       <div class="card"><div class="card-h"><div class="card-t">Oracle</div><div class="card-x"><span class="chip"><span class="soon-badge">coming soon</span></span></div></div>
         <div class="card-b"><div class="empty" style="text-align:left"><b>The assistant layer is not live yet.</b>When it is, it will answer against your own library.</div></div>
       </div>
@@ -119,13 +122,187 @@
   </section>
 
   <!-- ══ POLYMATH SCREENS ══ -->
-  <section class="view" id="view-profile"><div id="profile"></div></section>
-  <section class="view" id="view-web"><canvas id="webCanvas"></canvas><div id="webPanel" class="panel"></div></section>
-  <section class="view" id="view-books"><div id="booksWrap"></div></section>
-  <section class="view" id="view-stacks"><div id="stacksWrap"></div></section>
-  <section class="view" id="view-calendar"><div id="calWrap"></div></section>
-  <section class="view" id="view-thoughts"><div id="thoughtsWrap"></div></section>
-  <section class="view" id="view-vision"><div id="boardWrap"><canvas id="board"></canvas></div><div id="visPalette"></div></section>
+  <section class="view" id="view-profile">
+<div class="record">
+            <div class="record-id" id="idCard"></div>
+            <div class="record-body" id="recordBody"></div>
+          </div>
+</section>
+  <section class="view" id="view-web">
+<div class="web-wrap">
+            <div class="web-tools">
+              <button class="tool" id="wLink" title="Drag from one node to another to draw a strand">Draw strand</button>
+              <button class="tool" id="wAddSubject">Add subject</button>
+              <button class="tool" id="wReset" title="Return every node to the ring">Re-ring</button>
+              <label class="tool switch"><input type="checkbox" id="wAllStrands" checked><span>All strands</span></label>
+              <span class="tool-hint" id="wHint">Click a strand to open it. Drag a node to move it.</span>
+            </div>
+            <svg id="webSvg" class="web-svg"></svg>
+            <aside class="web-panel" id="webPanel" hidden></aside>
+          </div>
+</section>
+  <section class="view" id="view-books">
+<div class="shelf-head">
+            <input id="bkTitle" class="inp" placeholder="Title">
+            <input id="bkAuthor" class="inp" placeholder="Author">
+            <select id="bkStatus" class="inp narrow">
+              <option value="reading">Reading</option>
+              <option value="read">Finished</option>
+              <option value="want">Want to read</option>
+            </select>
+            <button class="btn" id="bkAdd">Shelve it</button>
+            <span class="shelf-sep"></span>
+            <label class="file-btn">Import list<input type="file" id="bkImport" accept=".csv,.xlsx,.xls,.tsv,.txt" hidden></label>
+            <button class="link-btn tiny" id="bkTemplate" title="Download a blank CSV in the right format">Template</button>
+            <span class="tool-hint" id="bkHint">Covers and spine colours are pulled from Open Library.</span>
+          </div>
+          <div class="shelves" id="shelves"></div>
+          <div class="book-stage" id="bookStage" hidden></div>
+</section>
+  <section class="view" id="view-stacks">
+<div class="stk-wrap">
+            <div class="stk-tools">
+              <button class="tool" id="stkAdd">New stack</button>
+              <button class="tool" id="stkTidy" title="Line every pile up on the floor">Tidy floor</button>
+              <button class="tool" id="stkFit">Fit view</button>
+              <span class="stk-zoomer">
+                <button class="tool tiny" id="stkOut">−</button>
+                <b id="stkZoom">100%</b>
+                <button class="tool tiny" id="stkIn">+</button>
+              </span>
+              <span class="tool-hint" id="stkHint">Drag the floor to walk around · scroll or pinch to zoom · drag a pile to move it · tap a pile to look at it side-on</span>
+            </div>
+            <div class="stk-room" id="stkRoom">
+              <div class="stk-floor" id="stkFloor">
+                <div class="stk-rug"></div>
+              </div>
+              <div class="stk-empty" id="stkEmpty" hidden>
+                <b>The floor is bare.</b>
+                <span>Make a stack. The top book is step one — everything under it is what comes next.</span>
+              </div>
+            </div>
+            <div class="stk-side" id="stkSide" hidden></div>
+          </div>
+</section>
+  <section class="view" id="view-calendar">
+<div class="cal-rig">
+            <aside class="strip left">
+              <div class="strip-block">
+                <h4>View</h4>
+                <div class="seg" id="calViews">
+                  <button data-v="month" class="on">Month</button>
+                  <button data-v="week">Week</button>
+                  <button data-v="day">Day</button>
+                  <button data-v="year">Year</button>
+                </div>
+              </div>
+              <div class="strip-block">
+                <h4>Calendars</h4>
+                <ul class="cal-list" id="calList"></ul>
+                <div class="row-add">
+                  <input id="calNewName" class="inp tiny" placeholder="New calendar">
+                  <button class="btn tiny" id="calAdd">+</button>
+                </div>
+              </div>
+              <div class="strip-block">
+                <h4>Google Calendar</h4>
+                <label class="file-btn">Import .ics<input type="file" id="icsFile" accept=".ics" hidden></label>
+                <p class="micro">Export from Google Calendar → Settings → Import/Export, then drop the file here.</p>
+              </div>
+            </aside>
+            <div class="cal-core">
+              <div class="cal-head">
+                <button class="nav-btn" id="calPrev">‹</button>
+                <h3 id="calTitle"></h3>
+                <button class="nav-btn" id="calNext">›</button>
+                <button class="nav-btn today" id="calToday">Today</button>
+              </div>
+              <div class="cal-square" id="calSquare"></div>
+            </div>
+            <aside class="strip right">
+              <div class="strip-block">
+                <h4>Workspace</h4>
+                <textarea id="wsInput" class="inp area" rows="2" placeholder="Task or note… (Enter to log)"></textarea>
+                <div class="ws-meta">
+                  <select id="wsCal" class="inp tiny"></select>
+                  <select id="wsKind" class="inp tiny"><option value="task">Task</option><option value="note">Note</option></select>
+                </div>
+              </div>
+              <div class="strip-block grow">
+                <h4>Unscheduled <span class="count" id="wsCount">0</span></h4>
+                <ul class="ws-list" id="wsList"></ul>
+                <p class="micro">Drag an item onto a day to schedule it.</p>
+              </div>
+            </aside>
+          </div>
+</section>
+  <section class="view" id="view-thoughts">
+<div class="margin-head">
+            <textarea id="thInput" class="inp area big" rows="2" placeholder="A thought, half-formed. ⌘/Ctrl+Enter to keep it."></textarea>
+            <div class="margin-controls">
+              <div class="seg" id="thKind"><button data-k="thought" class="on">Thought</button><button data-k="quote">Quote</button></div>
+              <input id="thWho" class="inp" placeholder="Said by…" hidden>
+              <input id="thSearch" class="inp" placeholder="Search / #tag">
+            </div>
+          </div>
+          <div class="margin-grid" id="thList"></div>
+</section>
+  <section class="view" id="view-vision">
+<div class="vb-tabbar">
+            <div class="vb-tabs" id="vbTabList"></div>
+            <button class="vb-tabadd" id="vbTabAdd" title="New board">+</button>
+          </div>
+          <div class="board-tools" id="boardTools">
+            <div class="bt-bar">
+              <span class="bt-title" id="vbBoardName">Board</span>
+              <span class="bt-hint">Drag a box to select · shift-click to add · ⌘/Ctrl+C then ⌘/Ctrl+V keeps the arrangement · space-drag to pan</span>
+              <span class="bt-sel" id="vbSelCount"></span>
+              <button class="bt-toggle" id="vbToolsToggle" aria-expanded="false" title="Show tools">
+                <svg viewBox="0 0 24 24" width="16" height="16"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+            </div>
+            <div class="bt-body">
+              <div class="bt-group">
+                <label class="file-btn">Add pictures<input type="file" id="vbFile" accept="image/*" multiple hidden></label>
+                <button class="btn ghost" id="vbNote">Add note</button>
+                <button class="btn ghost" id="vbBgBtn">Background…</button>
+              </div>
+              <div class="bt-group">
+                <button class="btn ghost" id="vbCopy" title="⌘/Ctrl+C">Copy</button>
+                <button class="btn ghost" id="vbPaste" title="⌘/Ctrl+V">Paste</button>
+                <button class="btn ghost" id="vbDupe" title="⌘/Ctrl+D">Duplicate</button>
+                <button class="btn ghost" id="vbSelAll">Select all</button>
+              </div>
+              <div class="bt-group" id="vbAlign">
+                <span class="bt-glabel">Align</span>
+                <button class="icn" data-a="left" title="Align left">⌐</button>
+                <button class="icn" data-a="cx" title="Centre across">┼</button>
+                <button class="icn" data-a="right" title="Align right">¬</button>
+                <button class="icn" data-a="top" title="Align top">⌃</button>
+                <button class="icn" data-a="cy" title="Centre down">≡</button>
+                <button class="icn" data-a="bottom" title="Align bottom">⌄</button>
+                <button class="icn wide" data-a="row" title="Lay out in a row">Row</button>
+                <button class="icn wide" data-a="grid" title="Lay out in a grid">Grid</button>
+              </div>
+              <div class="bt-group">
+                <button class="btn ghost" id="vbFront">Bring to front</button>
+                <button class="btn ghost danger" id="vbDel">Delete</button>
+              </div>
+              <div class="bt-group">
+                <button class="icn" id="vbOut">−</button>
+                <b class="bt-zoom" id="vbZoom">100%</b>
+                <button class="icn" id="vbIn">+</button>
+                <button class="btn ghost" id="vbFit">Fit</button>
+              </div>
+            </div>
+          </div>
+          <div class="board" id="board" tabindex="0">
+            <div class="board-plane" id="boardPlane"></div>
+            <div class="marquee" id="vbMarquee" hidden></div>
+            <div class="board-empty" id="vbEmpty">Nothing pinned yet. Add a picture, or paste one straight in.</div>
+          </div>
+          <div class="vb-bgpanel hidden" id="vbBgPanel"></div>
+</section>
 
   <!-- ══ GALLERY (Polymath board images) ══ -->
   <section class="view" id="view-board"><div id="boardBody"></div></section>
