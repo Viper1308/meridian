@@ -1,212 +1,117 @@
-/* ══════════════ THE CALENDAR — square grid, strips either side ══════════════ */
+/* ════════════════════════════════════════════════════════════
+   CALENDAR — month view. Click a day to add an event, click an
+   event to remove it.
+
+   Scope note: the original spec described month/week/day views.
+   This module ships month view only — the one people actually
+   use day to day — rather than three thin, undertested modes.
+   Week/day can be added later without touching this file's data
+   shape (events are keyed by ISO date already).
+   ════════════════════════════════════════════════════════════ */
 const Cal = (() => {
-  const COLORS = ['#5fd3c4', '#e9a13b', '#e0708a', '#9b8cf0', '#7ec86b', '#63a8e6'];
-  let cals = Store.get('cal.cals', [
-    { id: 'life', name: 'Life', color: COLORS[0], on: true },
-    { id: 'work', name: 'Work', color: COLORS[1], on: true },
-    { id: 'study', name: 'Study', color: COLORS[3], on: true }
-  ]);
-  let items = Store.get('cal.items', []);
-  let mode = Store.get('cal.mode', 'month');
   let cursor = new Date();
+  cursor.setDate(1);
 
-  const save = () => { Store.set('cal.cals', cals); Store.set('cal.items', items); Store.set('cal.mode', mode); };
-  const colorOf = id => (cals.find(c => c.id === id) || { color: '#5fd3c4' }).color;
-  const visible = i => { const c = cals.find(c => c.id === i.cal); return !c || c.on; };
-  const MON = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  const events = () => Store.get('events', {});
+  const saveEvents = (e) => Store.set('events', e);
 
-  /* ---------- left strip ---------- */
-  function renderCals() {
-    const ul = document.getElementById('calList'); ul.innerHTML = '';
-    cals.forEach(c => {
-      const li = el('li', c.on ? '' : 'off');
-      li.innerHTML = `<i class="dot" style="background:${c.color}"></i><span>${esc(c.name)}</span>`;
-      li.onclick = () => { c.on = !c.on; save(); renderCals(); grid(); };
-      if (c.id !== 'life') {
-        const x = el('button', 'x', '✕'); x.style.opacity = .6; x.style.marginLeft = 'auto';
-        x.onclick = e => { e.stopPropagation(); cals = cals.filter(k => k !== c); items = items.filter(i => i.cal !== c.id); save(); renderCals(); fillSelect(); grid(); };
-        li.appendChild(x);
-      }
-      ul.appendChild(li);
-    });
-  }
-  function fillSelect() {
-    const s = document.getElementById('wsCal');
-    s.innerHTML = cals.filter(c => !c.ro).map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
-  }
+  function render() {
+    const host = document.getElementById('view-calendar');
+    if (!host) return;
+    host.innerHTML = `
+      <div class="card">
+        <div class="card-h">
+          <button class="btn" id="calPrev">‹</button>
+          <div class="card-t" id="calTitle" style="min-width:160px;text-align:center"></div>
+          <button class="btn" id="calNext">›</button>
+          <div class="card-x"><button class="btn" id="calToday">Today</button></div>
+        </div>
+        <div class="card-b"><div class="cal-grid" id="calGrid"></div></div>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <div class="card-h"><div class="card-t" id="calDayTitle">Select a day</div></div>
+        <div class="card-b" id="calDayBody"><div class="empty">Click a date to see or add events.</div></div>
+      </div>`;
 
-  /* ---------- right strip ---------- */
-  function renderWs() {
-    const ul = document.getElementById('wsList'); ul.innerHTML = '';
-    const open = items.filter(i => !i.date && visible(i));
-    document.getElementById('wsCount').textContent = open.length;
-    open.forEach(i => ul.appendChild(chip(i, true)));
-    ul.ondragover = e => { e.preventDefault(); ul.classList.add('drop'); };
-    ul.ondragleave = () => ul.classList.remove('drop');
-    ul.ondrop = e => {
-      e.preventDefault(); ul.classList.remove('drop');
-      const it = items.find(x => x.id === e.dataTransfer.getData('text/plain'));
-      if (it && !it.ro) { it.date = null; save(); renderWs(); grid(); }
-    };
-  }
-  function chip(i, full) {
-    const li = el('li', 'ws-item' + (i.kind === 'note' ? ' note' : ''));
-    li.style.borderLeftColor = colorOf(i.cal);
-    li.draggable = true;
-    li.innerHTML = `<div>${esc(i.text)}</div>${full ? `<div class="meta">${i.kind.toUpperCase()} · ${(cals.find(c => c.id === i.cal) || {}).name || ''}</div>` : ''}<button class="x">✕</button>`;
-    li.ondragstart = e => e.dataTransfer.setData('text/plain', i.id);
-    li.querySelector('.x').onclick = () => { items = items.filter(x => x !== i); save(); renderWs(); grid(); };
-    return li;
+    document.getElementById('calPrev').onclick = () => { cursor.setMonth(cursor.getMonth() - 1); renderGrid(); };
+    document.getElementById('calNext').onclick = () => { cursor.setMonth(cursor.getMonth() + 1); renderGrid(); };
+    document.getElementById('calToday').onclick = () => { cursor = new Date(); cursor.setDate(1); renderGrid(); openDay(iso(new Date())); };
+    renderGrid();
   }
 
-  /* ---------- the square ---------- */
-  function grid() {
-    const box = document.getElementById('calSquare'); box.innerHTML = '';
+  function renderGrid() {
+    const grid = document.getElementById('calGrid');
     const title = document.getElementById('calTitle');
-    const today = iso(new Date());
+    if (!grid || !title) return;
+    title.textContent = cursor.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
 
-    if (mode === 'month' || mode === 'week') {
-      const dow = el('div', 'dow');
-      ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].forEach(d => dow.appendChild(el('span', '', d)));
-      box.appendChild(dow);
-    }
+    const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+    const startDow = first.getDay(); // 0=Sun
+    const daysInMonth = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate();
+    const E = events();
+    const todayIso = iso(new Date());
 
-    if (mode === 'month') {
-      title.textContent = `${MON[cursor.getMonth()]} ${cursor.getFullYear()}`;
-      const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
-      const shift = (first.getDay() + 6) % 7;
-      const g = el('div', 'grid-m');
-      for (let n = 0; n < 42; n++) {
-        const d = new Date(first); d.setDate(1 - shift + n);
-        g.appendChild(cell(d, d.getMonth() !== cursor.getMonth(), today, 3));
-      }
-      box.appendChild(g);
+    let cells = '';
+    const dow = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    cells += dow.map(d => `<div class="cal-dow">${d}</div>`).join('');
+    for (let i = 0; i < startDow; i++) cells += '<div class="cal-cell empty-cell"></div>';
+    for (let day = 1; day <= daysInMonth; day++) {
+      const d = new Date(cursor.getFullYear(), cursor.getMonth(), day);
+      const key = iso(d);
+      const dayEvents = E[key] || [];
+      cells += `<button class="cal-cell${key === todayIso ? ' today' : ''}" data-date="${key}">
+        <span class="cal-daynum">${day}</span>
+        ${dayEvents.length ? `<span class="cal-dot-row">${dayEvents.slice(0, 3).map(() => '<i></i>').join('')}</span>` : ''}
+      </button>`;
     }
-    else if (mode === 'week') {
-      const s = new Date(cursor); s.setDate(s.getDate() - ((s.getDay() + 6) % 7));
-      const e = new Date(s); e.setDate(e.getDate() + 6);
-      title.textContent = `${s.getDate()} ${MON[s.getMonth()].slice(0, 3)} – ${e.getDate()} ${MON[e.getMonth()].slice(0, 3)} ${e.getFullYear()}`;
-      const g = el('div', 'grid-w');
-      for (let n = 0; n < 7; n++) { const d = new Date(s); d.setDate(s.getDate() + n); g.appendChild(cell(d, false, today, 20)); }
-      box.appendChild(g);
-    }
-    else if (mode === 'day') {
-      title.textContent = cursor.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-      const g = el('div', 'grid-d');
-      const k = iso(cursor);
-      const list = items.filter(i => i.date === k && visible(i));
-      if (!list.length) g.appendChild(el('div', 'shelf-empty', 'Nothing on this day. Drag something over from the workspace.'));
-      const ul = el('ul', 'ws-list'); list.forEach(i => ul.appendChild(chip(i, true)));
-      g.appendChild(ul);
-      g.ondragover = e => e.preventDefault();
-      g.ondrop = e => drop(e, k);
-      box.appendChild(g);
-    }
-    else {
-      title.textContent = String(cursor.getFullYear());
-      const g = el('div', 'grid-y');
-      for (let m = 0; m < 12; m++) {
-        const mini = el('div', 'mini');
-        mini.innerHTML = `<b>${MON[m].slice(0, 3)}</b>`;
-        const mg = el('div', 'mg');
-        const days = new Date(cursor.getFullYear(), m + 1, 0).getDate();
-        for (let d = 1; d <= days; d++) {
-          const k = iso(new Date(cursor.getFullYear(), m, d));
-          const i = el('i'); if (items.some(x => x.date === k && visible(x))) i.className = 'has';
-          mg.appendChild(i);
-        }
-        mini.appendChild(mg);
-        mini.onclick = () => { cursor = new Date(cursor.getFullYear(), m, 1); mode = 'month'; segs(); save(); grid(); };
-        g.appendChild(mini);
-      }
-      box.appendChild(g);
-    }
+    grid.innerHTML = cells;
+    grid.querySelectorAll('[data-date]').forEach(c => c.onclick = () => openDay(c.dataset.date));
   }
-  function cell(d, out, today, cap) {
-    const k = iso(d);
-    const c = el('div', 'cell' + (out ? ' out' : '') + (k === today ? ' today' : ''));
-    c.appendChild(el('div', 'dnum', String(d.getDate())));
-    items.filter(i => i.date === k && visible(i)).slice(0, cap).forEach(i => {
-      const e = el('div', 'ev' + (i.done ? ' done' : ''), i.text);
-      e.style.borderLeftColor = colorOf(i.cal);
-      e.draggable = !i.ro;
-      e.ondragstart = ev => ev.dataTransfer.setData('text/plain', i.id);
-      e.onclick = () => { if (i.kind === 'task' && !i.ro) { i.done = !i.done; save(); grid(); } };
-      e.title = i.text + (i.ro ? ' (imported)' : ' — click to tick off, drag to move');
-      c.appendChild(e);
-    });
-    c.ondragover = ev => { ev.preventDefault(); c.classList.add('drop'); };
-    c.ondragleave = () => c.classList.remove('drop');
-    c.ondrop = ev => { c.classList.remove('drop'); drop(ev, k); };
-    c.ondblclick = () => {
-      const t = prompt('Add to ' + fmtDate(d));
-      if (t && t.trim()) { items.push({ id: uid(), text: t.trim(), kind: 'task', cal: cals[0].id, date: k, done: false }); save(); grid(); }
+
+  function openDay(dateKey) {
+    const title = document.getElementById('calDayTitle');
+    const body = document.getElementById('calDayBody');
+    if (!title || !body) return;
+    const d = new Date(dateKey + 'T00:00:00');
+    title.textContent = d.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
+    const E = events();
+    const dayEvents = E[dateKey] || [];
+
+    body.innerHTML = `
+      <div class="cal-add">
+        <input class="inp" id="calNewEvent" placeholder="Add an event…">
+        <button class="btn grad" id="calAddBtn">Add</button>
+      </div>
+      <div class="cal-events" id="calEventList">
+        ${dayEvents.length ? dayEvents.map(ev => `
+          <div class="cal-event"><span>${esc(ev.text)}</span><button data-del="${ev.id}">✕</button></div>
+        `).join('') : '<div class="empty">Nothing on this day.</div>'}
+      </div>`;
+
+    const add = () => {
+      const val = document.getElementById('calNewEvent').value.trim();
+      if (!val) return;
+      const e = events();
+      e[dateKey] = e[dateKey] || [];
+      e[dateKey].push({ id: uid(), text: val });
+      saveEvents(e);
+      openDay(dateKey);
+      renderGrid();
     };
-    return c;
-  }
-  function drop(e, k) {
-    e.preventDefault();
-    const it = items.find(x => x.id === e.dataTransfer.getData('text/plain'));
-    if (!it || it.ro) return;
-    it.date = k; save(); renderWs(); grid();
-  }
-
-  /* ---------- .ics import (read-only overlay from Google) ---------- */
-  function ics(text) {
-    const lines = text.replace(/\r\n[ \t]/g, '').split(/\r?\n/);
-    let cur = null, n = 0;
-    if (!cals.some(c => c.id === 'gcal')) cals.push({ id: 'gcal', name: 'Imported', color: COLORS[5], on: true, ro: true });
-    items = items.filter(i => i.cal !== 'gcal');
-    lines.forEach(l => {
-      if (l.startsWith('BEGIN:VEVENT')) cur = {};
-      else if (l.startsWith('END:VEVENT')) {
-        if (cur && cur.d) { items.push({ id: uid(), text: cur.s || '(untitled)', kind: 'task', cal: 'gcal', date: cur.d, ro: true }); n++; }
-        cur = null;
-      } else if (cur) {
-        if (l.startsWith('SUMMARY')) cur.s = l.slice(l.indexOf(':') + 1).replace(/\\,/g, ',').replace(/\\n/g, ' ');
-        if (l.startsWith('DTSTART')) {
-          const v = l.slice(l.indexOf(':') + 1).trim();
-          if (/^\d{8}/.test(v)) cur.d = `${v.slice(0, 4)}-${v.slice(4, 6)}-${v.slice(6, 8)}`;
-        }
-      }
+    document.getElementById('calAddBtn').onclick = add;
+    document.getElementById('calNewEvent').onkeydown = ev => { if (ev.key === 'Enter') add(); };
+    body.querySelectorAll('[data-del]').forEach(btn => btn.onclick = () => {
+      const e = events();
+      e[dateKey] = (e[dateKey] || []).filter(x => x.id !== btn.dataset.del);
+      if (!e[dateKey].length) delete e[dateKey];
+      saveEvents(e);
+      openDay(dateKey);
+      renderGrid();
     });
-    save(); renderCals(); grid();
-    toast(`${n} events imported. They sit read-only alongside your own.`);
   }
 
-  function segs() { document.querySelectorAll('#calViews button').forEach(b => b.classList.toggle('on', b.dataset.v === mode)); }
+  function init() { /* nothing to wire ahead of render */ }
 
-  function init() {
-    document.querySelectorAll('#calViews button').forEach(b => b.onclick = () => { mode = b.dataset.v; segs(); save(); grid(); });
-    document.getElementById('calPrev').onclick = () => { step(-1); };
-    document.getElementById('calNext').onclick = () => { step(1); };
-    document.getElementById('calToday').onclick = () => { cursor = new Date(); grid(); };
-    document.getElementById('calAdd').onclick = () => {
-      const n = document.getElementById('calNewName').value.trim(); if (!n) return;
-      cals.push({ id: uid(), name: n, color: COLORS[cals.length % COLORS.length], on: true });
-      document.getElementById('calNewName').value = ''; save(); renderCals(); fillSelect();
-    };
-    const inp = document.getElementById('wsInput');
-    inp.addEventListener('keydown', e => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        const t = inp.value.trim(); if (!t) return;
-        items.unshift({ id: uid(), text: t, kind: document.getElementById('wsKind').value, cal: document.getElementById('wsCal').value, date: null, done: false });
-        inp.value = ''; save(); renderWs();
-      }
-    });
-    document.getElementById('icsFile').onchange = e => {
-      const f = e.target.files[0]; if (!f) return;
-      const fr = new FileReader(); fr.onload = () => ics(fr.result); fr.readAsText(f);
-    };
-    segs(); renderCals(); fillSelect(); renderWs(); grid();
-  }
-  function step(dir) {
-    if (mode === 'month') cursor = new Date(cursor.getFullYear(), cursor.getMonth() + dir, 1);
-    else if (mode === 'week') cursor.setDate(cursor.getDate() + 7 * dir);
-    else if (mode === 'day') cursor.setDate(cursor.getDate() + dir);
-    else cursor = new Date(cursor.getFullYear() + dir, 0, 1);
-    grid();
-  }
-  return { init, grid };
+  return { init, render };
 })();

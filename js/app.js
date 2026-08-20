@@ -9,14 +9,10 @@
    sees exactly what failed instead of a blank page.
    ════════════════════════════════════════════════════════════ */
 const App = (() => {
-  const LIVE = ['dashboard', 'atlas'];
+  const LIVE = ['dashboard', 'atlas', 'record', 'books', 'calendar', 'margin'];
   const STUBS = {
-    record:   'Your personal profile card. Coming in module 2.',
     web:      'The subject knowledge graph — being recoded from scratch. Coming in module 3.',
-    books:    'Your reading shelf. Coming in module 2.',
     stacks:   'Draggable task piles. Coming in module 3.',
-    calendar: 'Month, week and day views. Coming in module 2.',
-    margin:   'Quick thoughts and quotes. Coming in module 2.',
     board:    'The vision board. Coming in module 3.',
     gallery:  'A live view of your Board pictures. Coming in module 3.',
     oracle:   'The AI assistant layer. Dormant by design — see the roadmap once it lands.',
@@ -39,6 +35,10 @@ const App = (() => {
     try {
       if (v === 'dashboard') Dashboard.render();
       if (v === 'atlas') Atlas.refresh();
+      if (v === 'record') Record.render();
+      if (v === 'books') Books.render();
+      if (v === 'calendar') Cal.render();
+      if (v === 'margin') Margin.render();
       if (STUBS[v]) renderStub(v);
     } catch (err) {
       showError('Rendering "' + v + '" failed.', err);
@@ -157,6 +157,13 @@ const App = (() => {
       const n = (window.SUBJECTS || []).reduce((a, s) => a + Atlas.nTopics(s), 0);
       const sub = document.getElementById('brandSub');
       if (sub) sub.textContent = (window.SUBJECTS || []).length + ' subjects · ' + n.toLocaleString('en-IN') + ' topics';
+    });
+
+    step('module init', () => {
+      if (typeof Record !== 'undefined') Record.init();
+      if (typeof Books !== 'undefined') Books.init();
+      if (typeof Cal !== 'undefined') Cal.init();
+      if (typeof Margin !== 'undefined') Margin.init();
     });
 
     step('initial view', () => {
