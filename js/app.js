@@ -26,16 +26,19 @@ const App = (() => {
     // refresh the target screen — guarded so missing DOM doesn't crash
     try {
       if (v === 'profile' && typeof Profile !== 'undefined') Profile.render();
-      if (v === 'web' && typeof Web !== 'undefined') Web.render();
+      if (v === 'web' && typeof Web !== 'undefined') Web.draw();
       if (v === 'books' && typeof Books !== 'undefined') Books.render();
-      if (v === 'stacks' && typeof Stacks !== 'undefined') Stacks.render();
-      if (v === 'calendar' && typeof Cal !== 'undefined') Cal.render();
+      if (v === 'stacks' && typeof Stacks !== 'undefined') Stacks.refresh();
+      if (v === 'calendar' && typeof Cal !== 'undefined') Cal.grid();
       if (v === 'thoughts' && typeof Margin !== 'undefined') Margin.render();
       if (v === 'vision' && typeof Board !== 'undefined') Board.refresh();
     } catch(e) { console.warn('render ' + v + ':', e.message); }
     if (v === 'dashboard') {
       Dashboard.render();
       Finance.render('financeCard');
+      Slideshow.render('slideBody', 'slideDots');
+    } else {
+      Slideshow.stop();
     }
     if (v === 'atlas') Atlas.refresh();
     if (v === 'board') Gallery.render();
@@ -89,6 +92,29 @@ const App = (() => {
     document.querySelectorAll('[data-view]').forEach(el => {
       el.addEventListener('click', () => go(el.dataset.view));
     });
+    // Foldable top bar — height is measured live so Atlas/Web/Stacks/Board
+    // sizing (which reads the --tb CSS var) stays correct whether it's
+    // folded, wrapped onto 2 lines on a narrow screen, or full height.
+    const tb = document.getElementById('topbar');
+    const foldBtn = document.getElementById('btnFold');
+    const setTbVar = () => {
+      const h = tb.classList.contains('folded') ? 0 : tb.offsetHeight;
+      document.documentElement.style.setProperty('--tb', h + 'px');
+    };
+    setTbVar();
+    window.addEventListener('resize', setTbVar);
+    new ResizeObserver(setTbVar).observe(tb);
+    if (foldBtn) foldBtn.onclick = () => {
+      tb.classList.toggle('folded');
+      document.body.classList.toggle('topbar-folded', tb.classList.contains('folded'));
+      Store.set('ui.topbarFolded', tb.classList.contains('folded'));
+      setTimeout(setTbVar, 240); // after the collapse transition
+    };
+    if (Store.get('ui.topbarFolded', false)) {
+      tb.classList.add('folded'); document.body.classList.add('topbar-folded');
+      setTimeout(setTbVar, 0);
+    }
+
     document.getElementById('btnBackup').onclick = backup;
     const fr = document.getElementById('fileRestore');
     if (fr) fr.onchange = e => { if (e.target.files[0]) restore(e.target.files[0]); };

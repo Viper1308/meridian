@@ -46,6 +46,8 @@ const Margin = (() => {
       ta.placeholder = kind === 'quote' ? 'The quote, as written. ⌘/Ctrl+Enter to keep it.' : 'A thought, half-formed. ⌘/Ctrl+Enter to keep it.';
     });
     document.getElementById('thSearch').oninput = e => { q = e.target.value.trim(); render(); };
+    const addBtn = document.getElementById('thAdd');
+    if (addBtn) addBtn.onclick = add;
     render();
   }
   function push(text, who, k) {

@@ -1,211 +1,174 @@
-# MERIDIAN — Project Specification
+# MERIDIAN — Project Specification (v2)
 
-## What it is
+## What changed this session
 
-A single-page personal knowledge operating system combining Polymath OS's seven
-utility screens with a study library, analytics dashboard, and a reserved AI
-assistant layer. Deployable as static files on Vercel with optional Supabase
-sync.
+Session 3 was a bug-fix pass triggered by real usage. One architectural
+problem was causing most of the reported issues at once; fixing it resolved
+several bugs simultaneously.
 
----
+### Root cause found
 
-## Architecture
+Polymath's original screens (Web, Stacks, Board) use `position:absolute;inset:0`
+internally, expecting a real, sized, positioned parent to fill. In the merged
+build, their parent (`.view` inside `.wrap`) had no explicit height and wasn't
+positioned — so those screens collapsed, overlapped, or rendered outside normal
+document flow. This explains "Web looks messed up," "Stacks doesn't reach the
+bottom," and the Board rendering problems all at once.
 
-```
-No build step. No framework. No npm.
-Plain HTML + CSS + vanilla JS served as static files.
-One index.html, one CSS file, 22 JS modules, 8 data files.
-Optional: Vercel serverless function for AI (api/oracle.js)
-Optional: Supabase for cross-device sync + shared storage with Polymath
-```
+**Fix:** `#view-web`, `#view-stacks`, `#view-vision` now get
+`position:relative; height:calc(100vh - var(--tb) - 36px)` — a real container
+sized against the actual topbar height, measured live.
 
----
+### Fixed and verified this session
 
-## The 11 screens
-
-| Tab | Module | Source | Status |
+| Issue reported | Root cause | Fix | Verified |
 |---|---|---|---|
-| Dashboard | `dashboard.js` | Meridian | ✅ Working — KPIs, area chart, donut, bars, activity feed |
-| Atlas | `atlas.js` | Meridian | ✅ Working — 8 subjects, 885 topics, notes, mastery tracking |
-| Record | `profile.js` | Polymath | ✅ Working — personal profile card |
-| Web | `web.js` | Polymath | ✅ Working — subject knowledge graph |
-| Books | `books.js` | Polymath | ✅ Working — reading shelf |
-| Stacks | `stacks.js` | Polymath | ✅ Working — draggable task piles |
-| Calendar | `calendar.js` | Polymath | ✅ Working — month/week/day views |
-| Margin | `thoughts.js` | Polymath | ✅ Working — quick thoughts/quotes/notes |
-| Board | `vision.js` | Polymath | ✅ Working — vision board with images |
-| Gallery | `board-view.js` | Meridian | ✅ Working — reads Polymath's board images from Supabase |
-| Oracle | `oracle.js` | Meridian | ⏸ Dormant — coming-soon screen with 4-phase roadmap |
+| Taskbar covers too much | 11 tabs + brand + toolbar all in one unwrapped flex row | Collapsible topbar, fold button docked as a small tab at the bottom edge, state remembered | ✅ tested — folds to 0px, `--tb` var updates live |
+| Blank space next to Markets | No content there | Autoplaying slideshow pulling from the shared Board via `Gallery.randomImages()` | ✅ renders, correct empty-state copy when not connected |
+| Atlas sidebar cropped | Hardcoded `max-height:calc(100vh - 140px)` didn't match real (wrapping) topbar height | Now uses the live `--tb` variable | ✅ |
+| Record squished, not full width | Leftover `max-width:700px` override from earlier session | Removed; uses Polymath's native full-width grid | ✅ |
+| Web "entirely messed up" | The root cause above, **plus** router was calling `Web.render()` which doesn't exist (the module only exports `draw`) | Container sizing fix + corrected router call | ✅ `Web.draw()` now confirmed callable |
+| Books input covered by taskbar | Side effect of the oversized/wrapping topbar | Resolved by the topbar fix | ✅ input elements confirmed present and unobstructed |
+| Stacks doesn't reach bottom, orange colours, centred textbox | Root cause above; Polymath's detail panel is an intentional full-screen dramatic overlay; amber was hardcoded | Container sizing fix; panel recoded as a compact corner-docked card; every amber swapped for the active theme's accent | ✅ |
+| Margin inputs "not working" | Not actually broken — the only way to submit was ⌘/Ctrl+Enter with no visible button | Added a real "Add" button wired to the existing save logic | ✅ tested — thought saved, input cleared, list updated |
+| Board/Gallery not working | Same root cause (Board/vision.js uses the same absolute-fill pattern) **plus** router called `Stacks.render()`/`Cal.render()` which don't exist on those modules | Container fix + corrected mismatched router calls (see below) | ✅ |
 
-## The 8 Atlas subjects (885 topics)
+### A second bug class found during testing: router/module API mismatches
 
-| Subject | Sections | Topics | Accent |
+While testing, several Polymath screens turned out to be silently broken
+because `app.js` called methods that don't exist on those modules — caught
+by the try/catch guard added last session, which logged a console warning
+and moved on instead of crashing, so the screen just... didn't render
+anything, with no visible error on screen.
+
+| Screen | Router called | Module actually exports | Fixed to |
 |---|---|---|---|
-| Economics | 14 | 118 | blue |
-| Finance | 12 | 103 | indigo |
-| Law (Indian emphasis) | 11 | 123 | violet |
-| Mathematics | 13 | 102 | sky |
-| Physics | 11 | 114 | cyan |
-| Business | 10 | 100 | teal |
-| Politics (India/US/UK/major powers) | 10 | 104 | magenta |
-| Computer Science | 12 | 121 | pink |
+| Web | `Web.render()` | `init`, `draw` | `Web.draw()` |
+| Stacks | `Stacks.render()` | `init`, `refresh` | `Stacks.refresh()` |
+| Calendar | `Cal.render()` | `init`, `grid` | `Cal.grid()` |
+| Board (Vision) | `Board.refresh()` | `init`, `render`, `refresh` | already correct, no change |
+
+This is very likely the deeper reason several screens "didn't seem to work" —
+not just the layout collapse, but three of the seven screens never being
+told to draw themselves at all. Every module's real exported API was
+audited against every router call this session; all seven now match.
 
 ---
 
-## 3 themes (toggleable)
+## Full current screen inventory
 
-| Theme | Aesthetic | Typography | Radii | Density |
-|---|---|---|---|---|
-| **Meridian** | Violet gradient, soft radial glows, raised cards | Inter sans-serif | 12px | Normal |
-| **Academy** | Dark charcoal #1a1c1e, olive/green accents, flat cards | Inter sans-serif | 8px | Relaxed |
-| **Command** | Near-black #050a12, ice-blue #3b9eff, scanline bg | JetBrains Mono | 3px clipped | Tight |
-
-Toggled via the ☀ button in the toolbar. Stored in localStorage, persists
-across sessions and syncs.
-
----
-
-## Cross-device sync
-
-- Uses Supabase (same project as Polymath)
-- Login gate appears when Supabase is configured in config.js
-- Same email + password as Polymath (same auth table)
-- Meridian keys prefixed `mrd:` in the shared `kv` table — no collision
-- Gallery reads Polymath's board images via signed URLs, no duplication
-- If Supabase is not configured, everything works locally with no sign-in
-
-### Login issue to be aware of
-
-Supabase's default signUp flow sends an email confirmation link. For this to
-work, the Supabase project's **Site URL** must be set:
-
-> Supabase Dashboard → Authentication → URL Configuration → Site URL
-
-Set it to your deployed URL (e.g. `https://meridian.datamotion.in`).
-
-If you already have a Polymath account, you do NOT need to create a new one.
-Just click "Log in" with the same email and password.
+| Tab | Module | Router calls | Status |
+|---|---|---|---|
+| Dashboard | `dashboard.js` | `Dashboard.render()` | ✅ |
+| Atlas | `atlas.js` | `Atlas.refresh()` | ✅ |
+| Record | `profile.js` (`Profile`) | `Profile.render()` | ✅ |
+| Web | `web.js` (`Web`) | `Web.draw()` | ✅ fixed this session |
+| Books | `books.js` (`Books`) | `Books.render()` | ✅ |
+| Stacks | `stacks.js` (`Stacks`) | `Stacks.refresh()` | ✅ fixed this session |
+| Calendar | `calendar.js` (`Cal`) | `Cal.grid()` | ✅ fixed this session |
+| Margin | `thoughts.js` (`Margin`) | `Margin.render()` | ✅ + Add button added |
+| Board | `vision.js` (`Board`) | `Board.refresh()` | ✅ |
+| Gallery | `board-view.js` (`Gallery`) | `Gallery.render()` | ✅ needs Supabase configured |
+| Oracle | `oracle.js` (`Oracle`) | `Oracle.renderScreen()` | ⏸ dormant by design |
 
 ---
 
-## Finance widget
+## New this session
 
-Lives on the Dashboard. Shows live stock prices + market news.
-
-- **Provider:** Finnhub.io (free tier, 60 calls/min, no card)
-- **Setup:** Sign up at finnhub.io → copy API key → paste into config.js
-- **Default tickers:** RELIANCE.NS, TCS.NS, HDFCBANK.NS, INFY.NS, SENSEX.BO
-- **Indian stocks:** Use `.NS` (NSE) or `.BO` (BSE) suffix
-- If no key is set, the card shows inline setup instructions
+- **Collapsible topbar** — fold button, docked as a small tab, state persists via `Store`
+- **Dynamic `--tb` CSS variable** — measured live by `ResizeObserver`, everything that needs to know the topbar's height reads this instead of a guess
+- **Dashboard slideshow** — `js/slideshow.js`, new module, autoplays every 5s, prev/next controls, pulls from `Gallery.randomImages(n)`
+- **`Gallery.randomImages(n)`** — new method on the Gallery module, shuffles across every board the user has, returns signed URLs + captions
 
 ---
 
-## Oracle (AI assistant) — future
+## Known limitation: the fix I could not fully verify
 
-Currently dormant. 4-phase roadmap displayed on the Oracle screen:
+Everything above was tested in a headless DOM, which does not compute real
+CSS layout (no actual pixel measurement, no real paint). What's confirmed:
 
-1. **Entry writer** — 5-pass written entries for any topic (built, dormant)
-2. **Conversational recall** — ask questions against your own notes
-3. **Socratic mode** — examines you on mastered topics
-4. **Ambient** — voice briefings on study gaps
+- Every module loads, every router call now hits a real method, no console
+  errors on any screen transition
+- The `--tb` variable updates correctly on fold/unfold
+- All DOM elements the Polymath modules expect are present and wired
 
-### Activation (when ready)
+What's **not** confirmed because a headless test can't check it:
 
-1. Get free API key from aistudio.google.com
-2. Vercel env vars: `AI_API_KEY`, `AI_PROVIDER=gemini`, `AI_MODEL=gemini-2.5-flash`
-3. Set `oracle: true` in config.js
-4. Redeploy
+- Whether the topbar actually visually fits on one line at your screen width,
+  or still wraps (if it wraps, the fold button and `--tb` measurement still
+  work correctly, they just measure a taller bar — but the aesthetic goal
+  of "one clean row" may not be met)
+- Whether Web, Stacks, and Board *look* right now that they have proper
+  containers — sizing is correct, but Web in particular was flagged for a
+  full recode, and this session only fixed its container, not its content
+- Real pointer/drag interactions in Stacks and Board (jsdom cannot simulate
+  actual pointer capture and drag physics)
 
----
-
-## File inventory (41 files)
-
-```
-index.html                 Shell — 11 tabs, all screen DOM
-css/meridian.css            Theme engine + all Meridian styles + Polymath bridge
-css/polymath.css            Polymath's original styles
-js/config.js                Single configuration file
-js/store.js                 localStorage layer + helpers
-js/sync.js                  Supabase auth + push/pull
-js/core.js                  Chart library (SVG)
-js/theme-engine.js          Theme toggling
-js/app.js                   Router, boot, auth gate
-js/atlas.js                 Study library screen
-js/dashboard.js             Analytics overview
-js/finance.js               Stock prices + news widget
-js/board-view.js             Gallery (Polymath images)
-js/oracle.js                AI writer (dormant)
-js/profile.js               Record
-js/web.js                   Knowledge graph
-js/books.js                 Book shelf
-js/stacks.js                Task stacks
-js/calendar.js              Calendar
-js/thoughts.js              Margin
-js/vision.js                Vision board
-js/connections.js            Subject graph data
-js/themes.js                Polymath theme data
-js/gestures.js              Touch handling
-js/mobile.js                Mobile adaptations
-data/economics.js           118 topics
-data/finance.js             103 topics
-data/law.js                 123 topics
-data/mathematics.js         102 topics
-data/physics.js             114 topics
-data/business.js            100 topics
-data/politics.js            104 topics
-data/computer-science.js    121 topics
-api/oracle.js               Serverless AI proxy (Vercel)
-supabase-setup.sql          Database schema
-README.md                   Deployment guide
-```
+**First thing to check next session if any of the above resurface:** look at
+browser dev tools' computed styles on the affected element directly, rather
+than reasoning from the CSS source — headless testing has a ceiling here.
 
 ---
 
-## What remains to be built
+## What remains — carried over from v1, still open
 
-### Priority 1 — Visual polish (next session)
+### Priority 1 — Web recode (explicitly deferred, per your instruction)
+
+You asked for Web to be recoded from scratch rather than patched. This
+session only fixed its *container* (it now has real space to render into
+instead of collapsing). The knowledge-graph rendering logic itself
+(`js/web.js`, `js/connections.js`) is untouched. This is the next major
+piece of work:
+
+- [ ] Decide what Web should actually show and how — current version is a
+  force-directed-ish node graph of subjects; confirm this is still the right
+  concept or specify a different one
+- [ ] Rebuild `web.js` against that spec
+- [ ] `connections.js` (142KB — by far the largest file in the project) holds
+  the subject graph data; audit whether it needs rebuilding too or just the
+  renderer
+
+### Priority 2 — Visual polish
 
 - [ ] **Theme 4: JARVIS holographic** — animated concentric SVG rings,
-  translucent glass panels, particle drift, radial HUD elements
-- [ ] **Layout density per theme** — `--density` variable is wired but needs
-  tuning: Command should tighten gaps, Academy should add whitespace
-- [ ] **Polymath screen deep styling** — the 7 Polymath screens now adopt theme
-  colours via CSS variable bridging, but some inner elements (calendar cells,
-  book cards, stack tiles) need per-theme treatment for full visual coherence
-- [ ] **Mobile responsive pass** — tab bar needs hamburger/drawer on narrow
-  screens; atlas needs swipe-to-go-back; dashboard cards need single-column
-  stacking below 600px
+  translucent glass panels, particle drift
+- [ ] **Layout density per theme** — `--density` variable exists but needs
+  real tuning per theme
+- [ ] **Mobile responsive pass** — tab bar needs a drawer/hamburger below
+  ~700px; verify the new fold button doesn't collide with anything on narrow
+  viewports
+- [ ] **Visual confirmation pass** — everything in this document marked ✅ was
+  verified structurally (right elements, right methods, no errors) but not
+  visually. A real-browser screenshot pass would catch anything headless
+  testing can't.
 
-### Priority 2 — Functional
+### Priority 3 — Functional
 
-- [ ] **Supabase Site URL documentation** — add to README: the exact dashboard
-  path for setting the redirect URL so email confirmation links work
-- [ ] **Oracle Phase 1 activation** — test the entry writer end-to-end with a
-  real Gemini key once deployed
-- [ ] **Export/import Atlas notes** — the backup button captures everything, but
-  a focused "export my Law notes as markdown" would be useful
-- [ ] **Search across all screens** — the dashboard search only covers Atlas
-  topics; extend it to Books, Margin, Calendar
+- [ ] Supabase Site URL documentation (carried over, still needed — see v1 spec)
+- [ ] Oracle Phase 1 activation test with a real key
+- [ ] Export/import Atlas notes as markdown
+- [ ] Search across all screens, not just Atlas
 
-### Priority 3 — Enhancements
+### Priority 4 — Enhancements
 
-- [ ] **More subjects** — adding one is: create `data/name.js`, add a
-  `<script>` tag. Candidates: Philosophy, History, Psychology
-- [ ] **Polymath ↔ Atlas cross-link** — marking a topic mastered in Atlas could
-  populate a node in the Web knowledge graph
-- [ ] **Pomodoro / focus timer** — on the Dashboard or as a floating widget
-- [ ] **Spaced repetition** — Atlas tracks when you marked each topic; a
-  scheduler that resurfaces them at increasing intervals
+- [ ] More subjects (Philosophy, History, Psychology)
+- [ ] Atlas ↔ Web cross-link (mastering a topic populates a graph node)
+- [ ] Pomodoro/focus timer
+- [ ] Spaced repetition scheduler
 
 ---
 
-## Deployment checklist
+## Deployment checklist (unchanged from v1)
 
 1. [ ] Unzip — files must be at repo root, not in a subfolder
 2. [ ] Push to GitHub (private repo)
 3. [ ] Vercel → import → Framework: Other, Build/Output: blank
 4. [ ] Deploy
-5. [ ] (Optional) config.js → supabase url + anonKey → commit → redeploy
+5. [ ] (Optional) `config.js` → supabase url + anonKey → commit → redeploy
 6. [ ] (Optional) Supabase → Auth → URL Config → Site URL = your domain
-7. [ ] (Optional) finnhub.io → get key → config.js → finance.key
+7. [ ] (Optional) finnhub.io → get key → `config.js` → `finance.key`
 8. [ ] (Optional) Custom domain: Vercel Domains + Cloudflare CNAME
+
+If anything from the "reported this session" table above resurfaces after
+deploying, tell me specifically which row — the fix, the file, and the exact
+line are all documented above, which makes it fast to re-open.

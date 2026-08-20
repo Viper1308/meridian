@@ -145,5 +145,29 @@ const Gallery = (() => {
 
   function invalidate() { loaded = false; urls = {}; }
 
-  return { render, invalidate };
+  /* used by the dashboard slideshow — a handful of signed URLs from
+     across every board, doesn't touch the gallery's own render state */
+  async function randomImages(n) {
+    if (!Sync.enabled || !Sync.currentUser()) return [];
+    if (!loaded) await pull();
+    const all = [];
+    Object.entries(items).forEach(([bid, list]) =>
+      (list || []).forEach(it => { if (it.type === 'img') all.push({ bid, it }); }));
+    if (!all.length) return [];
+    for (let i = all.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [all[i], all[j]] = [all[j], all[i]];
+    }
+    const picked = all.slice(0, n);
+    const out = [];
+    for (const { bid, it } of picked) {
+      const tries = bid === '__legacy' ? [it.id, 'vb:' + it.id] : ['vb:' + it.id];
+      let url = null;
+      for (const t of tries) { url = await imageUrl(t, 3600); if (url) break; }
+      if (url) out.push({ url, note: it.note || '' });
+    }
+    return out;
+  }
+
+  return { render, invalidate, randomImages };
 })();
