@@ -1,10 +1,30 @@
-# MERIDIAN — Module 3 of 3 (complete app)
+# MERIDIAN — Module 4, batch 1 of 2–3 (redesign in progress)
 
 Every screen is live: Dashboard, Atlas, Record, Books, Calendar, Margin, Web,
-Stacks, Board, Gallery. Oracle stays intentionally dormant. This is the
-finished rewrite.
+Stacks, Board, Gallery. Oracle stays intentionally dormant. Module 4 is a
+targeted redesign pass over seven screens per a new spec — see
+`spec.md` for the full running status (what's done, what's still queued).
 
-## What's new in this module
+## What's new in this batch (Module 4, part 1 of 2–3)
+
+- **Record** — rebuilt as a structured, LinkedIn-style ledger. The headline
+  card (name/role/place/bio/avatar) stays at the top, but underneath it now
+  has four dedicated, distinct sections — **Education**, **Experience**,
+  **Awards & Honours**, **Skills** — each with its own add/edit/remove
+  ledger instead of one free-form bio field standing in for a resume.
+  Skills render as scannable chips; the other three render as dated rows.
+- **Books** — now supports bulk import from an Excel sheet (`.xlsx`/`.xls`/
+  `.csv`, matched on Title/Author/Status columns, case-insensitive, Status
+  optional). The parser (SheetJS) loads lazily from a CDN only when Import
+  is actually clicked, so the default path stays exactly as offline as it
+  always was. Every book also now has a dedicated, collapsible note-taking
+  space attached to it, saved independently of the shelf entry.
+- **Margin** — full-width single-column cards are gone. The feed is now a
+  masonry, Pinterest-style layout of small, post-it sized cards (CSS
+  multi-column, 1–4 columns depending on width) — denser and more scannable
+  at a glance. Search, tagging, and the thought/quote toggle are unchanged.
+
+## What's new in Module 3 (previous)
 
 - **Web** — recoded from scratch. The old version broke because it used
   `position:absolute;inset:0` expecting a parent with real height, and the

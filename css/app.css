@@ -295,6 +295,30 @@ body.topbar-folded .topbar-fold svg{transform:rotate(180deg);}
 .rec-lead{margin-top:14px;font-size:13px;color:var(--dim);line-height:1.6;}
 .rec-lead b{color:var(--ink);}
 
+.rec-sections{margin-top:0;}
+.rec-section .card-b{padding-top:12px;}
+.rec-add-form{display:flex;flex-direction:column;gap:8px;padding:12px;margin-bottom:12px;
+  border-radius:var(--r-sm);background:var(--card2);border:1px dashed var(--line2);}
+.rec-entries{display:flex;flex-direction:column;gap:10px;}
+.rec-row{padding:12px;border-radius:var(--r-sm);background:var(--card2);border:1px solid var(--line);}
+.rec-row-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px;}
+.rec-row-t{font-size:13.5px;font-weight:600;}
+.rec-row-s{font-size:12px;color:var(--accent2);margin-top:2px;}
+.rec-row-p{font-size:11px;color:var(--faint);font-family:var(--mono);white-space:nowrap;flex:none;}
+.rec-row-d{font-size:12.5px;color:var(--dim);line-height:1.55;margin:8px 0 0;}
+.rec-row-btns{display:flex;gap:12px;margin-top:9px;}
+.rec-row-btns button{font-size:11px;color:var(--faint);}
+.rec-row-btns button:hover{color:var(--ink);}
+.rec-row-btns button[data-del]:hover{color:var(--rose);}
+.rec-chips{display:flex;flex-wrap:wrap;gap:8px;}
+.rec-chip{display:inline-flex;align-items:center;gap:7px;padding:7px 10px;border-radius:20px;
+  background:var(--card2);border:1px solid var(--line);font-size:12.5px;}
+.rec-chip b{font-weight:600;}
+.rec-chip i{font-style:normal;font-size:10px;color:var(--faint);padding:2px 6px;border-radius:8px;background:var(--raise);}
+.rec-chip button{color:var(--faint);font-size:12px;line-height:1;}
+.rec-chip button:hover{color:var(--ink);}
+.rec-chip button[data-del]:hover{color:var(--rose);}
+
 /* ═══ BOOKS ═══ */
 .shelf-form{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
 .shelf-form .inp{flex:1;min-width:140px;}
@@ -302,9 +326,18 @@ body.topbar-folded .topbar-fold svg{transform:rotate(180deg);}
 .book-row{display:flex;gap:10px;align-items:center;padding:12px 14px;border-radius:var(--r);
   background:var(--card);border:1px solid var(--line);margin-bottom:8px;}
 .book-info{flex:1;min-width:0;}
-.book-title{font-size:14px;font-weight:600;}
+.book-title{font-size:14px;font-weight:600;display:flex;align-items:center;gap:7px;}
 .book-author{font-size:12px;color:var(--faint);margin-top:2px;}
 .inp.narrow{width:auto;flex:0 0 140px;}
+.shelf-import{display:flex;align-items:center;gap:0;margin-top:10px;flex-wrap:wrap;}
+.book-note-dot{width:6px;height:6px;border-radius:50%;background:var(--accent2);display:inline-block;flex:none;}
+.book-row-wrap{margin-bottom:8px;}
+.book-row-wrap .book-row{margin-bottom:0;}
+.book-notes{padding:12px;border-radius:0 0 var(--r) var(--r);background:var(--card2);
+  border:1px solid var(--line);border-top:0;margin-top:-1px;}
+.book-notes[hidden]{display:none;}
+.book-notes-f{display:flex;align-items:center;gap:12px;margin-top:8px;}
+.book-notes-hint{font-size:11px;color:var(--faint);}
 
 /* ═══ CALENDAR ═══ */
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
@@ -332,13 +365,18 @@ body.topbar-folded .topbar-fold svg{transform:rotate(180deg);}
 .seg button{padding:8px 13px;font-size:12px;color:var(--dim);background:var(--raise);}
 .seg button.on{color:var(--ink);background:var(--card);}
 .mg-controls .inp{flex:1;min-width:120px;}
-.mg-card{margin-bottom:10px;}
+.mg-masonry{columns:1;column-gap:10px;}
+@media(min-width:640px){.mg-masonry{columns:2;}}
+@media(min-width:980px){.mg-masonry{columns:3;}}
+@media(min-width:1280px){.mg-masonry{columns:4;}}
+.mg-card{margin:0 0 10px;break-inside:avoid;display:inline-block;width:100%;}
+.mg-card .card-b{padding:11px 12px;}
 .mg-quote .card-b{border-left:2px solid var(--accent);}
-.mg-text{font-size:14.5px;line-height:1.6;margin:0;}
+.mg-text{font-size:13px;line-height:1.5;margin:0;}
 .mg-tag{color:var(--accent2);cursor:pointer;}
-.mg-who{font-size:12px;color:var(--dim);margin-top:8px;font-style:italic;}
-.mg-foot{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;
-  border-top:1px solid var(--line);font-size:11px;color:var(--faint);}
+.mg-who{font-size:11px;color:var(--dim);margin-top:7px;font-style:italic;}
+.mg-foot{display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;
+  border-top:1px solid var(--line);font-size:10px;color:var(--faint);}
 .mg-foot button{color:var(--faint);}
 .mg-foot button:hover{color:var(--rose);}
 

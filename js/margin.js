@@ -2,6 +2,10 @@
    MARGIN — quick thoughts and quotes. A visible Add button from
    the start (the old version relied only on ⌘/Ctrl+Enter, which
    read as broken because there was nothing to click).
+
+   Layout: a masonry, Pinterest-style feed of small post-it sized
+   cards (CSS multi-column, see .mg-masonry) instead of a single
+   full-width stacked list — denser, more scannable at a glance.
    ════════════════════════════════════════════════════════════ */
 const Margin = (() => {
   let kind = 'thought', q = '';
@@ -30,7 +34,7 @@ const Margin = (() => {
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
         <input id="mgSearch" placeholder="Search / #tag" value="${esc(q)}">
       </div>
-      <div id="mgList"></div>`;
+      <div id="mgList" class="mg-masonry"></div>`;
 
     document.getElementById('mgAdd').onclick = add;
     document.getElementById('mgInput').onkeydown = e => {
