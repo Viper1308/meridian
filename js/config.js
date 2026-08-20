@@ -8,8 +8,8 @@ window.MERIDIAN = {
   /* Supabase — same project as Polymath. Fill both in for
      cross-device sync + Board access. Leave blank for local-only. */
   supabase: {
-    url: '',
-    anonKey: ''
+    url: 'https://ddpajaezvreahlzyviku.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkcGFqYWV6dnJlYWhsenl2aWt1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNTcwNDUsImV4cCI6MjEwMjczMzA0NX0.UAj_IiEax24dZlgC9sEl1_ie5wDsgx7vP6R_UFRgGdg'
   },
 
   /* Oracle — flip to true once you have an AI key.
