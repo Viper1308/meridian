@@ -1,58 +1,66 @@
 /* ════════════════════════════════════════════════════════════
-   APP — the router for all 10 screens.
+   APP — router and boot.
+
+   Module 1 only knows about two real screens: Dashboard and Atlas.
+   Every other tab renders a "coming in module 2/3" stub instead of
+   pretending to be a working screen — no silent failures.
+
+   Boot is wrapped so that if any single step throws, the person
+   sees exactly what failed instead of a blank page.
    ════════════════════════════════════════════════════════════ */
 const App = (() => {
-  const VIEWS = ['profile','web','books','stacks','calendar','thoughts','vision',
-                 'dashboard','atlas','board','oracle'];
+  const LIVE = ['dashboard', 'atlas'];
+  const STUBS = {
+    record:   'Your personal profile card. Coming in module 2.',
+    web:      'The subject knowledge graph — being recoded from scratch. Coming in module 3.',
+    books:    'Your reading shelf. Coming in module 2.',
+    stacks:   'Draggable task piles. Coming in module 3.',
+    calendar: 'Month, week and day views. Coming in module 2.',
+    margin:   'Quick thoughts and quotes. Coming in module 2.',
+    board:    'The vision board. Coming in module 3.',
+    gallery:  'A live view of your Board pictures. Coming in module 3.',
+    oracle:   'The AI assistant layer. Dormant by design — see the roadmap once it lands.',
+  };
   let current = null;
 
   function go(v) {
-    if (!VIEWS.includes(v)) v = 'dashboard';
+    const isLive = LIVE.includes(v);
+    const isStub = Object.prototype.hasOwnProperty.call(STUBS, v);
+    if (!isLive && !isStub) v = 'dashboard';
     current = v;
-    VIEWS.forEach(s => {
-      const el = document.getElementById('view-' + s);
-      if (el) el.classList.toggle('on', s === v);
+
+    document.querySelectorAll('.view').forEach(el => {
+      el.classList.toggle('on', el.id === 'view-' + v);
     });
-    document.querySelectorAll('[data-view]').forEach(b => {
-      b.classList.toggle('on', b.dataset.view === v ||
-        (b.classList.contains('tab') && b.dataset.view === v));
-    });
-    // highlight active tab
     document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.view === v));
-    document.querySelectorAll('.pill[data-view]').forEach(p => p.classList.toggle('on', p.dataset.view === v));
 
     Store.set('lastView', v);
 
-    // refresh the target screen — guarded so missing DOM doesn't crash
     try {
-      if (v === 'profile' && typeof Profile !== 'undefined') Profile.render();
-      if (v === 'web' && typeof Web !== 'undefined') Web.draw();
-      if (v === 'books' && typeof Books !== 'undefined') Books.render();
-      if (v === 'stacks' && typeof Stacks !== 'undefined') Stacks.refresh();
-      if (v === 'calendar' && typeof Cal !== 'undefined') Cal.grid();
-      if (v === 'thoughts' && typeof Margin !== 'undefined') Margin.render();
-      if (v === 'vision' && typeof Board !== 'undefined') Board.refresh();
-    } catch(e) { console.warn('render ' + v + ':', e.message); }
-    if (v === 'dashboard') {
-      Dashboard.render();
-      Finance.render('financeCard');
-      Slideshow.render('slideBody', 'slideDots');
-    } else {
-      Slideshow.stop();
+      if (v === 'dashboard') Dashboard.render();
+      if (v === 'atlas') Atlas.refresh();
+      if (STUBS[v]) renderStub(v);
+    } catch (err) {
+      showError('Rendering "' + v + '" failed.', err);
     }
-    if (v === 'atlas') Atlas.refresh();
-    if (v === 'board') Gallery.render();
-    if (v === 'oracle') Oracle.renderScreen();
 
     window.scrollTo({ top: 0 });
-    // close the mobile nav if open
-    const mn = document.getElementById('mobileNav');
-    if (mn) mn.classList.remove('open');
+  }
+
+  function renderStub(v) {
+    const host = document.getElementById('view-' + v);
+    if (!host) return;
+    const title = v.charAt(0).toUpperCase() + v.slice(1);
+    host.innerHTML = `<div class="card stub">
+      <h2>${esc(title)}</h2>
+      <p>${esc(STUBS[v])}</p>
+      <div class="soon-tag">Coming soon</div>
+    </div>`;
   }
 
   function search(term) {
     const q = term.toLowerCase();
-    for (const s of window.SUBJECTS) {
+    for (const s of (window.SUBJECTS || [])) {
       for (let si = 0; si < s.sections.length; si++) {
         const ti = s.sections[si].topics.findIndex(t =>
           (t[0] + ' ' + (t[1] || '')).toLowerCase().includes(q));
@@ -63,14 +71,17 @@ const App = (() => {
   }
 
   function backup() {
-    const blob = new Blob([JSON.stringify({
-      v: 1, at: Date.now(), app: 'meridian', data: Store.dump()
-    }, null, 1)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'meridian-' + today() + '.json';
-    a.click(); URL.revokeObjectURL(a.href);
-    toast('Backed up.');
+    try {
+      const blob = new Blob([JSON.stringify({
+        v: 1, at: Date.now(), app: 'meridian', module: 1, data: Store.dump()
+      }, null, 1)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'meridian-' + today() + '.json';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      toast('Backed up.');
+    } catch (e) { toast('Backup failed: ' + e.message); }
   }
 
   function restore(file) {
@@ -78,165 +89,86 @@ const App = (() => {
     fr.onload = () => {
       try {
         const j = JSON.parse(fr.result);
-        if (!j.data) throw 0;
+        if (!j.data) throw new Error('no data field');
         Store.load(j.data);
         toast('Restored. Reloading…');
         setTimeout(() => location.reload(), 700);
       } catch (e) { toast('Not a valid backup file.'); }
     };
+    fr.onerror = () => toast('Could not read that file.');
     fr.readAsText(file);
   }
 
-  async function boot() {
-    // Wire all tab/monitor clicks
-    document.querySelectorAll('[data-view]').forEach(el => {
-      el.addEventListener('click', () => go(el.dataset.view));
-    });
-    // Foldable top bar — height is measured live so Atlas/Web/Stacks/Board
-    // sizing (which reads the --tb CSS var) stays correct whether it's
-    // folded, wrapped onto 2 lines on a narrow screen, or full height.
-    const tb = document.getElementById('topbar');
-    const foldBtn = document.getElementById('btnFold');
-    const setTbVar = () => {
-      const h = tb.classList.contains('folded') ? 0 : tb.offsetHeight;
-      document.documentElement.style.setProperty('--tb', h + 'px');
-    };
-    setTbVar();
-    window.addEventListener('resize', setTbVar);
-    new ResizeObserver(setTbVar).observe(tb);
-    if (foldBtn) foldBtn.onclick = () => {
-      tb.classList.toggle('folded');
-      document.body.classList.toggle('topbar-folded', tb.classList.contains('folded'));
-      Store.set('ui.topbarFolded', tb.classList.contains('folded'));
-      setTimeout(setTbVar, 240); // after the collapse transition
-    };
-    if (Store.get('ui.topbarFolded', false)) {
-      tb.classList.add('folded'); document.body.classList.add('topbar-folded');
-      setTimeout(setTbVar, 0);
-    }
+  function showError(headline, err) {
+    const b = document.getElementById('bootErr');
+    if (!b) { console.error(headline, err); return; }
+    b.hidden = false;
+    b.innerHTML = '<b>' + esc(headline) + '</b>' +
+      '<span>' + esc((err && err.message) || String(err)) + '</span>' +
+      '<span>Check the browser console for the full trace. The rest of the app should still work — try another tab.</span>';
+    console.error(headline, err);
+  }
 
-    document.getElementById('btnBackup').onclick = backup;
-    const fr = document.getElementById('fileRestore');
-    if (fr) fr.onchange = e => { if (e.target.files[0]) restore(e.target.files[0]); };
-    const bo = document.getElementById('btnOut');
-    if (bo) bo.onclick = async () => { await Sync.signOut(); location.reload(); };
+  function step(label, fn) {
+    try { fn(); }
+    catch (e) { showError('Startup step failed: ' + label, e); }
+  }
 
-    // Theme engine
-    ThemeEngine.init();
-    const thBtn = document.getElementById('btnTheme');
-    if (thBtn) {
-      thBtn.onclick = () => {
-        const themes = ThemeEngine.THEMES;
-        const cur = ThemeEngine.current();
-        const idx = themes.findIndex(t => t.id === cur);
-        ThemeEngine.apply(themes[(idx + 1) % themes.length].id);
-        toast('Theme: ' + ThemeEngine.THEMES.find(t => t.id === ThemeEngine.current()).name);
+  function boot() {
+    step('theme', () => Theme.init());
+
+    step('topbar fold button', () => {
+      const tb = document.getElementById('topbar');
+      const foldBtn = document.getElementById('btnFold');
+      if (!tb || !foldBtn) return;
+      foldBtn.onclick = () => {
+        tb.classList.toggle('folded');
+        document.body.classList.toggle('topbar-folded', tb.classList.contains('folded'));
+        Store.set('topbarFolded', tb.classList.contains('folded'));
       };
-    }
-
-    // Init Polymath's modules
-    // Polymath modules may need specific DOM; guard each one
-    const safeInit = (name, mod) => {
-      try { if (typeof mod !== 'undefined' && mod && mod.init) mod.init(); }
-      catch(e) { console.warn(name + '.init() skipped:', e.message); }
-    };
-    safeInit('Profile', typeof Profile!=='undefined'&&Profile);
-    safeInit('Web', typeof Web!=='undefined'&&Web);
-    safeInit('Books', typeof Books!=='undefined'&&Books);
-    safeInit('Margin', typeof Margin!=='undefined'&&Margin);
-    safeInit('Calendar', typeof Cal!=='undefined'&&Cal);
-    safeInit('Stacks', typeof Stacks!=='undefined'&&Stacks);
-    safeInit('Vision', typeof Board!=='undefined'&&Board);
-
-    // Sync
-    if (Sync.enabled) {
-      const res = await Sync.init();
-      if (res.enabled && res.user) {
-        // already signed in
-        start(true);
-        return;
-      } else if (res.enabled && !res.user) {
-        // show gate
-        showGate();
-        return;
+      if (Store.get('topbarFolded', false)) {
+        tb.classList.add('folded');
+        document.body.classList.add('topbar-folded');
       }
-    }
-    // local-only mode
-    start(false);
-  }
+    });
 
-  function showGate() {
-    const gate = document.getElementById('gate');
-    gate.hidden = false;
-    document.body.classList.add('locked');
-    let isSignup = false;
+    step('theme toggle button', () => {
+      const btn = document.getElementById('btnTheme');
+      if (btn) btn.onclick = () => {
+        const t = Theme.cycle();
+        toast('Theme: ' + t.name);
+      };
+    });
 
-    function paintGate() {
-      document.getElementById('gateBtn').textContent = isSignup ? 'Create account' : 'Log in';
-      document.getElementById('gateSwitch').innerHTML = isSignup
-        ? 'Already have an account? <a href="#" id="gateLink">Log in instead</a>'
-        : 'If you use Polymath, same email and password. <a href="#" id="gateLink">Or create a new account</a>';
-      document.getElementById('gateLink').onclick = e => { e.preventDefault(); isSignup = !isSignup; paintGate(); };
-    }
-    paintGate();
+    step('backup/restore buttons', () => {
+      const bb = document.getElementById('btnBackup');
+      if (bb) bb.onclick = backup;
+      const fr = document.getElementById('fileRestore');
+      if (fr) fr.onchange = e => { if (e.target.files[0]) restore(e.target.files[0]); };
+    });
 
-    document.getElementById('gateBtn').onclick = async () => {
-      const email = document.getElementById('gateUser').value.trim();
-      const pass = document.getElementById('gatePass').value;
-      const errEl = document.getElementById('gateErr');
-      if (!email || !pass) { errEl.textContent = 'Email and password, please.'; return; }
-      if (pass.length < 6) { errEl.textContent = 'At least 6 characters.'; return; }
-      const btn = document.getElementById('gateBtn');
-      btn.disabled = true; btn.textContent = isSignup ? 'Creating…' : 'Signing in…';
-      try {
-        if (isSignup) {
-          const r = await Sync.signUp(email, pass);
-          if (r.needsConfirm) {
-            errEl.textContent = 'Check your email to confirm, then come back and log in. If the link fails, go to your Supabase dashboard → Authentication → Users and confirm manually.';
-            isSignup = false; btn.disabled = false; paintGate(); return;
-          }
-        } else {
-          await Sync.signIn(email, pass);
-        }
-        await Sync.pullAll();
-        gate.hidden = true;
-        document.body.classList.remove('locked');
-        start(true);
-      } catch (e) {
-        errEl.textContent = e.message || 'Sign in failed.';
-        btn.disabled = false; paintGate();
-      }
-    };
-    document.getElementById('gatePass').onkeydown = e => { if (e.key === 'Enter') document.getElementById('gateBtn').click(); };
-    document.getElementById('gateSkip').onclick = () => {
-      gate.hidden = true; document.body.classList.remove('locked');
-      toast('Working offline.'); start(false);
-    };
-  }
+    step('tab clicks', () => {
+      document.querySelectorAll('.tab[data-view]').forEach(el => {
+        el.addEventListener('click', () => go(el.dataset.view));
+      });
+    });
 
-  function start(synced) {
-    if (synced && Sync.currentUser()) {
-      const el = document.getElementById('whoami');
-      if (el) { el.textContent = (Sync.currentUser().email || '').split('@')[0]; el.parentElement.hidden = false; }
-      document.getElementById('btnOut').hidden = false;
-    }
+    step('subject count in masthead', () => {
+      const n = (window.SUBJECTS || []).reduce((a, s) => a + Atlas.nTopics(s), 0);
+      const sub = document.getElementById('brandSub');
+      if (sub) sub.textContent = (window.SUBJECTS || []).length + ' subjects · ' + n.toLocaleString('en-IN') + ' topics';
+    });
 
-    // Set subtitle
-    const n = window.SUBJECTS.reduce((a, s) => a + s.sections.reduce((b, x) => b + x.topics.length, 0), 0);
-    const sub = document.getElementById('brandSub');
-    if (sub) sub.textContent = window.SUBJECTS.length + ' subjects · ' + n.toLocaleString('en-IN') + ' topics';
-
-    Atlas.snapshot();
-    go(Store.get('lastView', 'dashboard'));
+    step('initial view', () => {
+      const last = Store.get('lastView', 'dashboard');
+      go(LIVE.includes(last) ? last : 'dashboard');
+    });
   }
 
   document.addEventListener('DOMContentLoaded', () => {
-    boot().catch(err => {
-      console.error(err);
-      const b = document.getElementById('bootErr');
-      if (b) { b.hidden = false; b.innerHTML = '<b>Startup failed.</b><span>' + String(err.message) + '</span>'; }
-    });
+    try { boot(); }
+    catch (err) { showError('Startup failed entirely.', err); }
   });
 
-  return { go, search, backup, start };
+  return { go, search, backup };
 })();
